@@ -78,7 +78,7 @@ test('order ticket modal requires the product, quantity, and payment method fiel
   );
   assert.deepEqual(
     modal.components.map((row) => row.components[0].placeholder),
-    ['DEKOR / BOBUX / SVBOWCH / PREMS', '1-9999', 'GCASH / BANKTRANS / PAYMAYA'],
+    ['DEKOR / BOBUX / SVBOWCH / PREMS / NAYTRO / GCRED1TS', '1-9999', 'GCASH / BANKTRANS / PAYMAYA'],
   );
 });
 
@@ -104,11 +104,20 @@ test('order ticket form accepts only listed products and payment methods with qu
   }), {
     value: { product: 'SVBOWCH', quantity: '3', paymentMethod: 'GCASH' },
   });
+  for (const product of ['NAYTRO', 'GCRED1TS']) {
+    assert.deepEqual(parseOrderTicketForm({
+      product: product.toLowerCase(),
+      quantity: '1',
+      paymentMethod: 'GCASH',
+    }), {
+      value: { product, quantity: '1', paymentMethod: 'GCASH' },
+    });
+  }
   assert.deepEqual(parseOrderTicketForm({
     product: 'OTHER',
     quantity: '3',
     paymentMethod: 'GCASH',
-  }), { error: 'PRODUCT must be DEKOR, BOBUX, SVBOWCH, or PREMS.' });
+  }), { error: 'PRODUCT must be DEKOR, BOBUX, SVBOWCH, PREMS, NAYTRO, or GCRED1TS.' });
   assert.deepEqual(parseOrderTicketForm({
     product: 'PREMS',
     quantity: '10000',
@@ -740,6 +749,18 @@ test('voidedchannel slash command is registered with a required channel option',
   assert.equal(command.options[0].required, true);
 });
 
+test('/tip channel and /tip send are registered with their required options', () => {
+  const command = commands.find((entry) => entry.name === 'tip');
+  assert.ok(command);
+  assert.equal(command.default_member_permissions, undefined);
+  const channelCommand = command.options.find((option) => option.name === 'channel');
+  const sendCommand = command.options.find((option) => option.name === 'send');
+  assert.equal(channelCommand.options[0].name, 'channel');
+  assert.equal(channelCommand.options[0].required, true);
+  assert.equal(sendCommand.options[0].name, 'amount');
+  assert.equal(sendCommand.options[0].required, true);
+});
+
 test('payment and giveaway slash commands expose matching subcommands', () => {
   const payment = commands.find((entry) => entry.name === 'payment');
   const giveaway = commands.find((entry) => entry.name === 'giveaway');
@@ -907,6 +928,15 @@ test('ticket transcript channel setup is registered under /set for administrator
   const transcriptSubcommand = setCommand.options.find((option) => option.name === 'ticket_transcript');
   assert.ok(transcriptSubcommand);
   assert.equal(transcriptSubcommand.options[0].name, 'channel');
+  assert.equal(setCommand.default_member_permissions, '8');
+});
+
+test('/set voidvouch is registered for administrators with a required channel', () => {
+  const setCommand = commands.find((command) => command.name === 'set');
+  const subcommand = setCommand.options.find((option) => option.name === 'voidvouch');
+  assert.ok(subcommand);
+  assert.equal(subcommand.options[0].name, 'channel');
+  assert.equal(subcommand.options[0].required, true);
   assert.equal(setCommand.default_member_permissions, '8');
 });
 

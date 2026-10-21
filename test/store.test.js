@@ -464,6 +464,35 @@ test('completed orders can be marked voided once with the automatic-close reason
   assert.equal(store.markOrderVoided(order.id, 'No Vouch = Voided'), null);
 });
 
+test('voided orders without an existing ticket vouch can be listed for recovery', () => {
+  const store = createStore();
+  const eligible = store.addOrder({
+    guildId: 'guild-1', customerId: 'buyer-1', sourceChannelId: 'ticket-1',
+    items: 'DEKOR', paymentMethod: 'GCash', supporterId: 'staff-1', quantity: 1,
+  });
+  const alreadyVouched = store.addOrder({
+    guildId: 'guild-1', customerId: 'buyer-1', sourceChannelId: 'ticket-2',
+    items: 'BOBUX', paymentMethod: 'GCash', supporterId: 'staff-1', quantity: 1,
+  });
+  const otherBuyer = store.addOrder({
+    guildId: 'guild-1', customerId: 'buyer-2', sourceChannelId: 'ticket-3',
+    items: 'PREMS', paymentMethod: 'GCash', supporterId: 'staff-1', quantity: 1,
+  });
+  for (const order of [eligible, alreadyVouched, otherBuyer]) {
+    store.finishOrder(order.id, 'completed');
+    store.markOrderVoided(order.id, 'No Vouch = Voided');
+  }
+  store.addVouch({
+    guildId: 'guild-1', userId: 'buyer-1', items: 'BOBUX', ticketChannelId: 'ticket-2',
+  });
+
+  assert.deepEqual(
+    store.listVoidedOrdersForVouch('guild-1', 'buyer-1').map((order) => order.id),
+    [eligible.id],
+  );
+  assert.deepEqual(store.listVoidedOrdersForVouch('guild-2', 'buyer-1'), []);
+});
+
 test('giveaway entries, winners, bans, and tracked message counts persist', () => {
   const store = createStore();
   const giveaway = store.createGiveaway({

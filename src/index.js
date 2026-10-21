@@ -155,6 +155,21 @@ async function getEligibleVouchTicket(guildId, ticketChannelId, userId) {
   return { channel, order };
 }
 
+async function getEligibleVoidedVouchOrder(guildId, userId, ticketChannelId) {
+  const orders = store.listVoidedOrdersForVouch(guildId, userId)
+    .filter((order) => !ticketChannelId || order.sourceChannelId === ticketChannelId);
+  for (const order of orders) {
+    try {
+      const channel = await client.channels.fetch(order.sourceChannelId, { force: true });
+      if (!channel) return order;
+    } catch (error) {
+      if (error.code === 10003 || error.status === 404) return order;
+      throw error;
+    }
+  }
+  return null;
+}
+
 async function prepareVouchPreview(interaction, {
   guildId,
   submittedItems,
@@ -162,6 +177,7 @@ async function prepareVouchPreview(interaction, {
   feedback,
   proofs,
   ticketChannel,
+  voidedRecovery = false,
 }) {
   const settings = store.getSettings(guildId);
   if (!settings?.vouchChannelId) {
@@ -234,6 +250,7 @@ async function prepareVouchPreview(interaction, {
       ticketKey,
       items,
       vouchedAt,
+      voidedRecovery,
       warrantyDmUserId: interaction.user.id,
       embed,
       proofCollage,
@@ -403,12 +420,18 @@ async function handleVouchPreviewButton(interaction) {
   preview.processing = true;
   await interaction.deferUpdate();
   try {
-    const ticket = await getEligibleVouchTicket(
-      preview.guildId,
-      preview.ticketChannelId,
-      preview.userId,
-    );
-    if (!ticket || pendingVouchesByTicket.get(preview.ticketKey) !== previewId) {
+    const eligibleOrder = preview.voidedRecovery
+      ? await getEligibleVoidedVouchOrder(
+        preview.guildId,
+        preview.userId,
+        preview.ticketChannelId,
+      )
+      : await getEligibleVouchTicket(
+        preview.guildId,
+        preview.ticketChannelId,
+        preview.userId,
+      );
+    if (!eligibleOrder || pendingVouchesByTicket.get(preview.ticketKey) !== previewId) {
       discardVouchPreview(previewId);
       return interaction.editReply({
         content: 'This ticket is no longer eligible for a vouch, or a vouch was already submitted.',
@@ -462,7 +485,7 @@ async function handleVouchPreviewButton(interaction) {
       }
     }
     discardVouchPreview(previewId);
-    if (preview.ticketChannelId) {
+    if (preview.ticketChannelId && !preview.voidedRecovery) {
       try {
         const ticketChannel = await client.channels.fetch(preview.ticketChannelId);
         if (ticketChannel && ticketChannel.guildId === preview.guildId
@@ -1171,6 +1194,69 @@ async function handleCommand(interaction) {
     return interaction.reply({ content: `Vouches will be posted in ${channel}.`, ephemeral: true });
   }
 
+  if (interaction.commandName === 'set' && interaction.options.getSubcommand() === 'voidvouch') {
+    const channel = interaction.options.getChannel('channel', true);
+    if (!channel.isTextBased() || typeof channel.send !== 'function' || channel.guildId !== interaction.guildId) {
+      return interaction.reply({ content: 'Choose a text channel in this server.', ephemeral: true });
+    }
+    store.setSettings(interaction.guildId, { voidVouchChannelId: channel.id });
+    return interaction.reply({ content: `Customers with voided orders can vouch in ${channel}.`, ephemeral: true });
+  }
+
+  if (interaction.commandName === 'tip' && interaction.options.getSubcommand() === 'channel') {
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({ content: 'Only a server administrator can set the tip channel.', ephemeral: true });
+    }
+    const channel = interaction.options.getChannel('channel', true);
+    if (!channel.isTextBased() || typeof channel.send !== 'function' || channel.guildId !== interaction.guildId) {
+      return interaction.reply({ content: 'Choose a text channel in this server.', ephemeral: true });
+    }
+    store.setSettings(interaction.guildId, { tipChannelId: channel.id });
+    return interaction.reply({ content: `All tips will be posted in ${channel}.`, ephemeral: true });
+  }
+
+  if (interaction.commandName === 'tip' && interaction.options.getSubcommand() === 'send') {
+    const settings = store.getSettings(interaction.guildId);
+    if (!isOrderStaff(interaction, settings)) {
+      return interaction.reply({ content: 'Only authorized staff can send tips.', ephemeral: true });
+    }
+    const tipChannelId = settings?.tipChannelId;
+    if (!tipChannelId) {
+      return interaction.reply({ content: 'The tip channel is not configured. Ask an administrator to run `/tip channel channel:#tips`.', ephemeral: true });
+    }
+    const recipientId = ticketOwnerId(interaction.channel);
+    if (!recipientId) {
+      return interaction.reply({ content: 'Run `/tip send` inside an active ticket so the ticket owner can be mentioned.', ephemeral: true });
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+    let channel;
+    try {
+      channel = await client.channels.fetch(tipChannelId);
+    } catch {
+      return interaction.editReply('The configured tip channel could not be found. Ask an administrator to set it again with `/tip channel`.');
+    }
+    if (!channel?.isTextBased() || typeof channel.send !== 'function' || channel.guildId !== interaction.guildId) {
+      return interaction.editReply('The configured tip destination is not a text channel in this server. Ask an administrator to set it again with `/tip channel`.');
+    }
+
+    const amount = new Intl.NumberFormat('en-PH', { maximumFractionDigits: 2 })
+      .format(interaction.options.getNumber('amount', true));
+    const tipEmoji = (name) => interaction.guild.emojis.cache
+      .find((emoji) => emoji.name === name)?.toString() ?? `:${name}:`;
+    const message = [
+      `_ _      ${tipEmoji('purple_rawr')}     :     <@${recipientId}>`,
+      `_ _         thank you for the tip !  ₱${amount}  ${tipEmoji('purplestar')}`,
+      `            Grazie mille。。${tipEmoji('emoji_30~2')}`,
+    ].join('\n\n');
+
+    await sendV2(channel, {
+      content: message,
+      allowedMentions: { parse: [], users: [recipientId] },
+    });
+    return interaction.editReply(`Tip message for <@${recipientId}> sent to ${channel}.`);
+  }
+
   if (interaction.commandName === 'set' && interaction.options.getSubcommand() === 'ticket_transcript') {
     const channel = interaction.options.getChannel('channel', true);
     if (!channel.isTextBased() || typeof channel.send !== 'function' || channel.guildId !== interaction.guildId) {
@@ -1548,6 +1634,30 @@ async function handleCommand(interaction) {
   }
 
   if (interaction.commandName === 'vouch') {
+    const settings = store.getSettings(interaction.guildId);
+    if (interaction.channelId === settings?.voidVouchChannelId) {
+      if (!hasVoidedRole(settings, (roleId) => memberHasRole(interaction, roleId))) {
+        return interaction.reply({ content: 'Only customers with a voided order can vouch in this channel.', ephemeral: true });
+      }
+      const order = await getEligibleVoidedVouchOrder(interaction.guildId, interaction.user.id);
+      if (!order) {
+        return interaction.reply({ content: 'No closed, voided order is available for a vouch.', ephemeral: true });
+      }
+      const submittedItems = interaction.options.getString('items', true).trim();
+      const feedback = interaction.options.getString('feedback', true).trim();
+      const proofs = ['proof', 'proof2']
+        .map((name) => interaction.options.getAttachment(name))
+        .filter(Boolean);
+      return prepareVouchPreview(interaction, {
+        guildId: interaction.guildId,
+        submittedItems,
+        quantity: order.quantity ?? null,
+        feedback,
+        proofs,
+        ticketChannel: { id: order.sourceChannelId },
+        voidedRecovery: true,
+      });
+    }
     if (ticketOwnerId(interaction.channel) !== interaction.user.id
       || !/(?:^|;)ticket-type:order(?:;|$)/.test(interaction.channel?.topic ?? '')) {
       return interaction.reply({
@@ -1972,22 +2082,14 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.isChatInputCommand()) await handleCommand(interaction);
     else if (interaction.isButton() && interaction.customId.startsWith('vouch:shortcut:')) {
       const [, , guildId, ticketChannelId] = interaction.customId.split(':');
-      const ticket = await getEligibleVouchTicket(guildId, ticketChannelId, interaction.user.id);
-      if (!ticket) {
+      const ticketKey = `${guildId}:${ticketChannelId}`;
+      if (pendingVouchesByTicket.has(ticketKey)) {
         await interaction.reply({
-          content: 'This button is only for the owner of its active, completed order ticket. Each ticket can be vouched once.',
+          content: 'A vouch for this ticket is already waiting for confirmation.',
           ephemeral: true,
         });
       } else {
-        const ticketKey = `${guildId}:${ticketChannelId}`;
-        if (pendingVouchesByTicket.has(ticketKey)) {
-          await interaction.reply({
-            content: 'A vouch for this ticket is already waiting for confirmation.',
-            ephemeral: true,
-          });
-        } else {
-          await interaction.showModal(vouchFormModal(guildId, ticketChannelId));
-        }
+        await interaction.showModal(vouchFormModal(guildId, ticketChannelId));
       }
     }
     else if (interaction.isButton() && interaction.customId.startsWith('vouch-preview:')) await handleVouchPreviewButton(interaction);

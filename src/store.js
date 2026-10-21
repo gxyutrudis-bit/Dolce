@@ -352,6 +352,23 @@ class OrderStore {
       .filter((order) => order.status === 'completed' && (!guildId || order.guildId === guildId));
   }
 
+  listVoidedOrdersForVouch(guildId, userId) {
+    const state = this.read();
+    const vouchedTicketIds = new Set((state.vouches ?? [])
+      .filter((vouch) => vouch.guildId === guildId)
+      .map((vouch) => vouch.ticketChannelId));
+    return (state.orders ?? [])
+      .filter((order) => (
+        order.guildId === guildId
+        && order.customerId === userId
+        && order.status === 'completed'
+        && order.voidedAt
+        && order.sourceChannelId
+        && !vouchedTicketIds.has(order.sourceChannelId)
+      ))
+      .sort((first, second) => second.voidedAt.localeCompare(first.voidedAt));
+  }
+
   markWarrantyVoidNotified(orderId, notifiedAt = new Date().toISOString()) {
     const state = this.read();
     const order = state.orders.find((entry) => entry.id === orderId);

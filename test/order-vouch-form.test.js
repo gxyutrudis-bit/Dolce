@@ -35,6 +35,15 @@ test('order vouch form accepts the supported products and quantities', () => {
   }), {
     value: { product: 'PREMS', quantity: '2', feedback: 'Nice' },
   });
+  for (const product of ['NAYTRO', 'GCRED1TS']) {
+    assert.deepEqual(parseOrderVouchForm({
+      product: product.toLowerCase(),
+      quantity: '1',
+      feedback: 'Good',
+    }), {
+      value: { product, quantity: '1', feedback: 'Good' },
+    });
+  }
 });
 
 test('order vouch form rejects unsupported products, invalid quantities, and blank feedback', () => {
@@ -42,7 +51,7 @@ test('order vouch form rejects unsupported products, invalid quantities, and bla
     product: 'OTHER',
     quantity: '1',
     feedback: 'Good',
-  }), { error: 'PRODUCT must be DEKOR, BOBUX, SVBOWCH, or PREMS.' });
+  }), { error: 'PRODUCT must be DEKOR, BOBUX, SVBOWCH, PREMS, NAYTRO, or GCRED1TS.' });
   assert.deepEqual(parseOrderVouchForm({
     product: 'PREMS',
     quantity: '10000',

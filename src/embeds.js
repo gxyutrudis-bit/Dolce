@@ -93,7 +93,7 @@ function vouchFormModal(guildId, ticketChannelId) {
         component: new TextInputBuilder()
           .setCustomId('product')
           .setStyle(TextInputStyle.Short)
-          .setPlaceholder('DEKOR / BOBUX / SVBOWCH / PREMS')
+          .setPlaceholder('DEKOR / BOBUX / SVBOWCH / PREMS / NAYTRO / GCRED1TS')
           .setMaxLength(20)
           .setRequired(true),
       }),
@@ -558,7 +558,7 @@ function orderTicketModal() {
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
           .setMaxLength(1024)
-          .setPlaceholder('DEKOR / BOBUX / SVBOWCH / PREMS'),
+          .setPlaceholder('DEKOR / BOBUX / SVBOWCH / PREMS / NAYTRO / GCRED1TS'),
       ),
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()

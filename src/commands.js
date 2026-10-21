@@ -45,12 +45,39 @@ module.exports = [
         .setRequired(true)
         .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)))
     .addSubcommand((subcommand) => subcommand
+      .setName('voidvouch')
+      .setDescription('Choose where customers can vouch after a ticket was voided and closed.')
+      .addChannelOption((option) => option
+        .setName('channel')
+        .setDescription('Channel where voided customers can submit their vouch')
+        .setRequired(true)
+        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)))
+    .addSubcommand((subcommand) => subcommand
       .setName('voided_role')
       .setDescription('Choose the role assigned when an order is completed.')
       .addRoleOption((option) => option
         .setName('role')
         .setDescription('Role assigned on completion and removed after a vouch within 12 hours')
         .setRequired(true))),
+  new SlashCommandBuilder()
+    .setName('tip')
+    .setDescription('Configure the tip channel or send a tip.')
+    .addSubcommand((subcommand) => subcommand
+      .setName('channel')
+      .setDescription('Choose where all tips will be posted.')
+      .addChannelOption((option) => option
+        .setName('channel')
+        .setDescription('Channel for tips')
+        .setRequired(true)
+        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)))
+    .addSubcommand((subcommand) => subcommand
+      .setName('send')
+      .setDescription('Send a tip thank-you message from this ticket.')
+      .addNumberOption((option) => option
+        .setName('amount')
+        .setDescription('Tip amount in Philippine pesos')
+        .setRequired(true)
+        .setMinValue(0.01))),
   new SlashCommandBuilder()
     .setName('setowner')
     .setDescription('Choose the role allowed to manage orders and close tickets.')
