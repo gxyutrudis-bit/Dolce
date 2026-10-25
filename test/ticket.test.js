@@ -541,7 +541,18 @@ test('payment reminder V2 container shows the server icon as a right-side thumbn
     type: 9,
     components: [{
       type: 10,
-      content: '゛ **Dolce Vita payment reminders:**  ⸝⸝   .ᐟ 𑣲\n» send the payment details via screenshot.\n» pls complete your payment within 12hrs.\n» once payment is verified, the order will be processed.\n» no rush of orders!\n» pls click `pay` to proceed, `no` to cancel.',
+      content: [
+        '_ _ ─────────────  <:purpledonut:1557485667091746896>  ─────────────',
+        '_ _',
+        '_ _       **𝓓olce   𝓥ita**   payment   __reminders__    !!',
+        '_ _ ⚬  send   the  payment  details  via  screenshot.',
+        '_ _ ⚬  please complete your payment within 12 hrs.',
+        '_ _ ⚬  order    will    be    processed   once   verified.',
+        '_ _ ⚬  strictly   no   rushing  of  orders.   thank  you!',
+        '_ _ ⚬  click  ` pay `  to  proceed,  ` no `  to  cancel.',
+        '_ _',
+        '_ _ ─────────────  <:purplecupcake:1557485583960379402>  ─────────────',
+      ].join('\n'),
     }],
     accessory: {
       type: 11,
@@ -563,7 +574,18 @@ test('payment reminder V2 container supports servers without a custom icon', () 
   assert.equal(container.components[1].type, 1);
   assert.equal(
     container.components[0].content,
-    '゛ **Dolce Vita payment reminders:**  ⸝⸝   .ᐟ 𑣲\n» send the payment details via screenshot.\n» pls complete your payment within 12hrs.\n» once payment is verified, the order will be processed.\n» no rush of orders!\n» pls click `pay` to proceed, `no` to cancel.',
+    [
+      '_ _ ─────────────  <:purpledonut:1557485667091746896>  ─────────────',
+      '_ _',
+      '_ _       **𝓓olce   𝓥ita**   payment   __reminders__    !!',
+      '_ _ ⚬  send   the  payment  details  via  screenshot.',
+      '_ _ ⚬  please complete your payment within 12 hrs.',
+      '_ _ ⚬  order    will    be    processed   once   verified.',
+      '_ _ ⚬  strictly   no   rushing  of  orders.   thank  you!',
+      '_ _ ⚬  click  ` pay `  to  proceed,  ` no `  to  cancel.',
+      '_ _',
+      '_ _ ─────────────  <:purplecupcake:1557485583960379402>  ─────────────',
+    ].join('\n'),
   );
 });
 
@@ -576,14 +598,20 @@ test('vouch embed matches the order-details layout and Philippine time zone', ()
   }, '1 Deco', 'Great service!', vouchedAt).toJSON();
 
   assert.equal(embed.title, undefined);
-  assert.equal(embed.description, undefined);
-  assert.deepEqual(embed.fields.map(({ name, value }) => [name, value]), [
-    ['✨ • order details', '**buyer:** <@user-123>'],
-    ['🔹 item', '1 Deco'],
-    ['🔹 date vouched', 'October 05, 2026 at 6:53 AM GMT+8'],
-    ['🔹 feedback', 'Great service!'],
-    ['🔹 proof', 'See the attached proof image below.'],
-  ]);
+  assert.equal(embed.fields, undefined);
+  assert.equal(embed.description, [
+    '_ _ ・・・・  ๑   <a:hearts7:1562814717481844808>   ๑  ・・・・',
+    '_ _',
+    '_ _       <:00_candybar:1562793451223916695>  —  𝓞rder  𝓓etails',
+    '_ _ ➠  buyer  :  <@user-123>',
+    '_ _',
+    '_ _ ⚬  item  :  1 Deco',
+    '_ _ ⚬  date vouched  :  October 05, 2026 at 6:53 AM GMT+8',
+    '_ _ ⚬  feedback  :  Great service!',
+    '_ _ ⚬  proof  :  see the attached image.',
+    '_ _',
+    '_ _ ・・・・  ๑   <a:hearts7:1562814717481844808>   ๑  ・・・・',
+  ].join('\n'));
 });
 
 test('completed order reminder embed has no title and the warranty policy description', () => {
@@ -666,18 +694,27 @@ test('removed order and voided-role message shortcuts are not recognized', () =>
   assert.equal(parseTicketMessageCommand(',setrolevoided 9876543210'), null);
 });
 
-test('voided order notice includes the requested text, buyer, item, and reason', () => {
+test('voided order notice uses the requested layout and includes buyer, item, and reason', () => {
   const message = voidedOrderMessage({
     id: '1234567890',
     username: 'alice',
     tag: 'alice#0001',
   }, 'ROBUX');
 
-  assert.match(message, /<:purpledonut:1557485667091746896>  warranty voided/);
-  assert.match(message, /<@1234567890> has been revoked the \*\*warranty\*\*/);
-  assert.match(message, /@alice \| 1234567890/);
-  assert.match(message, /\*\*item\*\*\n_ _        ⧽ ROBUX/);
-  assert.match(message, /No Vouch \/ Wrong Vouch = Warranty Voided/);
+  assert.equal(message, [
+    '_ _ ─────────────  <:00_treat:1562793410157613156>  ─────────────',
+    '_ _',
+    '_ _  <@1234567890>, your __warranty__ has been **voided**.',
+    '_ _',
+    '_ _ <:purpleflower:1557500052107304981>  user  :  @alice  | 1234567890 of ticket owner',
+    '_ _ <:purpleflower:1557500052107304981>  item purchased  :',
+    '_ _ ⎯⎯  ROBUX',
+    '_ _ <:purpleflower:1557500052107304981>  reason  :',
+    '_ _ ⎯⎯  no vouch = warranty voided',
+    '_ _',
+    '_ _ ─────────────  <a:pinkletter:1450249803530244337>  ─────────────',
+    '_ _',
+  ].join('\n'));
 });
 
 test('payment details embed includes GCash instructions and the attached payment thumbnail', () => {

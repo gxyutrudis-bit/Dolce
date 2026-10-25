@@ -31,18 +31,22 @@ function orderContainer(order) {
         ? 'expired'
         : order.processingStatus === 'processing' ? 'processing' : 'noted';
   const sourceChannel = order.sourceChannelId ? `<#${order.sourceChannelId}>` : 'Unknown channel';
+  const buyer = order.customerId ? `<@${order.customerId}>` : 'Unknown buyer';
   const servedBy = order.supporterId ? `<@${order.supporterId}>` : 'Not assigned';
   const item = order.items ?? order.item;
   const quantity = order.quantity ?? 1;
   return new ContainerBuilder()
     .addTextDisplayComponents(new TextDisplayBuilder().setContent([
       '_ _',
-      ` _ _    🧁   order from ${sourceChannel}`,
-      `  _ _     ⤷   ${item} (x${quantity})`,
-      `   _ _     ⤷   paid via ${order.paymentMethod ?? 'Not specified'}`,
-      `    _ _     ⤷   status: __**${status}**__`,
-      `     _ _     ⤷   served by ${servedBy}`,
-      '     _ _',
+      '_ _       ──────────  <:0cpink_bow:1562803659190829126>  ──────────',
+      '_ _              ꒰  <:00_treat:1562793410157613156>  ꒱   **order**  __list__   !!',
+      `_ _                 ⚬  ${sourceChannel} : ${buyer} ticket owner`,
+      `_ _                 ⚬  #${orderReference(order)}．${item ?? 'Unknown item'} (x${quantity})`,
+      `_ _                 ⚬  paid via __${order.paymentMethod ?? 'Not specified'}__`,
+      `_ _                 ⚬  status   :   __${status}__`,
+      `_ _         served by ${servedBy} <a:sweet_nom:1561070811773935797>`,
+      '_ _       ──────────  <a:pinkletter:1562804355856597092>  ──────────',
+      '_ _',
     ].join('\n')))
     .addActionRowComponents(orderButtons(order));
 }
@@ -146,19 +150,18 @@ function voidedOrderMessage(user, product) {
   const username = user?.username ? `@${user.username}` : '@unknown';
   const userId = user?.id ?? 'unknown';
   return [
-      '_ _',
-      '_ _       <:purpledonut:1557485667091746896>  warranty voided',
-      `_ _       ${user?.id ? `<@${user.id}>` : '@user'} has been revoked the **warranty**`,
-      '_ _',
-      '_ _       **user**',
-      `_ _        ⧽ ${username} | ${userId}`,
-      '_ _',
-      '_ _       **item**',
-      `_ _        ⧽ ${String(product ?? 'Unknown product')}`,
-      '_ _',
-      '_ _       **reason**',
-      '_ _        ⧽ No Vouch / Wrong Vouch = Warranty Voided',
-      '_ _',
+    '_ _ ─────────────  <:00_treat:1562793410157613156>  ─────────────',
+    '_ _',
+    `_ _  ${user?.id ? `<@${user.id}>` : '@user'}, your __warranty__ has been **voided**.`,
+    '_ _',
+    `_ _ <:purpleflower:1557500052107304981>  user  :  ${username}  | ${userId} of ticket owner`,
+    '_ _ <:purpleflower:1557500052107304981>  item purchased  :',
+    `_ _ ⎯⎯  ${String(product ?? 'Unknown product')}`,
+    '_ _ <:purpleflower:1557500052107304981>  reason  :',
+    '_ _ ⎯⎯  no vouch = warranty voided',
+    '_ _',
+    '_ _ ─────────────  <a:pinkletter:1450249803530244337>  ─────────────',
+    '_ _',
     ].join('\n');
 }
 
@@ -293,7 +296,18 @@ function giveawayContainer(giveaway, ended = false) {
 function paymentReminderContainer(serverIconUrl) {
   const container = new ContainerBuilder()
     .setAccentColor(0x3478c7);
-  const reminderText = '゛ **Dolce Vita payment reminders:**  ⸝⸝   .ᐟ 𑣲\n» send the payment details via screenshot.\n» pls complete your payment within 12hrs.\n» once payment is verified, the order will be processed.\n» no rush of orders!\n» pls click `pay` to proceed, `no` to cancel.';
+  const reminderText = [
+    '_ _ ─────────────  <:purpledonut:1557485667091746896>  ─────────────',
+    '_ _',
+    '_ _       **𝓓olce   𝓥ita**   payment   __reminders__    !!',
+    '_ _ ⚬  send   the  payment  details  via  screenshot.',
+    '_ _ ⚬  please complete your payment within 12 hrs.',
+    '_ _ ⚬  order    will    be    processed   once   verified.',
+    '_ _ ⚬  strictly   no   rushing  of  orders.   thank  you!',
+    '_ _ ⚬  click  ` pay `  to  proceed,  ` no `  to  cancel.',
+    '_ _',
+    '_ _ ─────────────  <:purplecupcake:1557485583960379402>  ─────────────',
+  ].join('\n');
   if (serverIconUrl) {
     container.addSectionComponents(
       new SectionBuilder()
@@ -318,13 +332,19 @@ function vouchEmbed(user, items, feedback, vouchedAt = new Date()) {
   }).format(vouchedAt);
   return new EmbedBuilder()
     .setColor(0x35a16b)
-    .addFields(
-      { name: '✨ • order details', value: `**buyer:** <@${user.id}>`, inline: false },
-      { name: '🔹 item', value: items, inline: false },
-      { name: '🔹 date vouched', value: date, inline: false },
-      { name: '🔹 feedback', value: feedback, inline: false },
-      { name: '🔹 proof', value: 'See the attached proof image below.', inline: false },
-    );
+    .setDescription([
+      '_ _ ・・・・  ๑   <a:hearts7:1562814717481844808>   ๑  ・・・・',
+      '_ _',
+      '_ _       <:00_candybar:1562793451223916695>  —  𝓞rder  𝓓etails',
+      `_ _ ➠  buyer  :  <@${user.id}>`,
+      '_ _',
+      `_ _ ⚬  item  :  ${items}`,
+      `_ _ ⚬  date vouched  :  ${date}`,
+      `_ _ ⚬  feedback  :  ${feedback}`,
+      '_ _ ⚬  proof  :  see the attached image.',
+      '_ _',
+      '_ _ ・・・・  ๑   <a:hearts7:1562814717481844808>   ๑  ・・・・',
+    ].join('\n'));
 }
 
 function warrantyActivatedContainer(user, items, vouchedAt = new Date()) {
@@ -450,33 +470,21 @@ function queueEmbed(orders) {
   return embed;
 }
 
-function centeredQueueLines(lines) {
-  const longestLineLength = Math.max(...lines.map((line) => Array.from(line
-    .replace(/<:[^:]+:\d+>/g, 'x')
-    .replace(/<@!?&?\d+>/g, '@username')
-    .replace(/[*_`]/g, '')).length));
-  const padding = Math.max(0, Math.floor((48 - longestLineLength) / 2));
-  return lines.map((line) => `${'\u2002'.repeat(padding)}${line}`);
-}
-
 function queueConfirmationMessage(order) {
-  const preparedBy = order.preparedById ? `<@${order.preparedById}>` : 'Not recorded';
-  const [itemLine, paymentLine] = centeredQueueLines([
-    `•  ( ${order.quantity ?? 1} ) — ${order.items ?? order.item}`,
-    `•  pαιd vια ${order.paymentMethod ?? 'Not specified'}`,
-  ]);
+  const ticket = order.sourceChannelId ? `<#${order.sourceChannelId}>` : 'Unknown ticket';
+  const buyer = order.customerId ? `<@${order.customerId}>` : 'Unknown buyer';
+  const supporter = order.supporterId ? `<@${order.supporterId}>` : 'Not assigned';
+  const item = order.items ?? order.item ?? 'Unknown item';
   return [
     '_ _',
-    `${'\u2002'.repeat(6)}**( <:purpledonut:1557485667091746896> )  from dolce vita !**`,
-    `${'\u2002'.repeat(4)}yoυr order ιs noted, <@${order.customerId}> . . .`,
-    '',
-    `${'\u2002'.repeat(3)}━━━━━━━━━━  order detαιls  ━━━━━━━━━━`,
-    itemLine,
-    paymentLine,
-    '     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-    `_ _                      •  prepαred by ${preparedBy} . . .`,
-    '',
-    '-#  _ _                  no cαncellαtιon / rush orders<a:purpleribbon:1557485625102565538>',
+    '_ _       ──────────  <:0cpink_bow:1562803659190829126>  ──────────',
+    '_ _              ꒰  <:00_treat:1562793410157613156>  ꒱   **order**  __queue__   !!',
+    `_ _                 ⚬  ${ticket}  :  ${buyer} ticket owner`,
+    `_ _                 ⚬  #${orderReference(order)}．${item} ${order.quantity ?? 1}`,
+    `_ _                 ⚬  paid via __${order.paymentMethod ?? 'Not specified'}__`,
+    `_ _                 ⚬  status   :   __${orderStatusLabel(order)}__`,
+    `_ _         served by ${supporter} <a:sweet_nom:1561070811773935797>`,
+    '_ _       ──────────  <a:pinkletter:1562804355856597092>  ──────────',
     '_ _',
   ].join('\n');
 }

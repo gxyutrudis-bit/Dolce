@@ -1374,7 +1374,7 @@ async function handleCommand(interaction) {
     return interaction.reply({
       content: queueConfirmationMessage(order),
       allowedMentions: {
-        users: [...new Set([order.customerId, order.preparedById].filter(Boolean))],
+        users: [...new Set([order.customerId, order.supporterId].filter(Boolean))],
       },
     });
   }
