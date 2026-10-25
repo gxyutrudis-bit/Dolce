@@ -1,6 +1,7 @@
 function orderStatusLabel(order) {
   if (order.status === 'completed') return 'Complete';
   if (order.status === 'cancelled') return 'Cancelled';
+  if (order.status === 'expired') return 'Expired';
   if (order.processingStatus === 'processing') return 'Processing';
   return 'Noted';
 }

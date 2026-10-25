@@ -178,8 +178,8 @@ test('queue confirmation uses the new layout and includes ticket, owner, order, 
     '_ _',
     '_ _       ──────────  <:0cpink_bow:1562803659190829126>  ──────────',
     '_ _              ꒰  <:00_treat:1562793410157613156>  ꒱   **order**  __queue__   !!',
-    '_ _                 ⚬  <#ticket-1>  :  <@buyer-1> ticket owner',
-    '_ _                 ⚬  #DEKOR．DEKOR 2',
+    '_ _                 ⚬  <#ticket-1>  :  <@buyer-1>',
+    '_ _                 ⚬  DEKOR．2',
     '_ _                 ⚬  paid via __GCash__',
     '_ _                 ⚬  status   :   __Noted__',
     '_ _         served by <@staff-1> <a:sweet_nom:1561070811773935797>',
@@ -249,15 +249,16 @@ test('completed and cancelled statuses override processing in the order containe
   };
 
   const completedContainer = orderContainer(order).toJSON();
-  assert.match(completedContainer.components[0].content, /status   :   __done__/);
+  assert.match(completedContainer.components[0].content, /status   :   __Complete__/);
   const cancelledContainer = orderContainer({ ...order, status: 'cancelled' }).toJSON();
-  assert.match(cancelledContainer.components[0].content, /status   :   __cancelled__/);
+  assert.match(cancelledContainer.components[0].content, /status   :   __Cancelled__/);
 });
 
 test('source-channel status labels reflect processing, complete, and cancelled transitions', () => {
   assert.equal(orderStatusLabel({ status: 'claimed', processingStatus: 'processing' }), 'Processing');
   assert.equal(orderStatusLabel({ status: 'completed', processingStatus: 'processing' }), 'Complete');
   assert.equal(orderStatusLabel({ status: 'cancelled', processingStatus: 'not_yet' }), 'Cancelled');
+  assert.equal(orderStatusLabel({ status: 'expired', processingStatus: 'not_yet' }), 'Expired');
 });
 
 test('order status notification embed includes the order status and details', () => {
@@ -306,11 +307,11 @@ test('new order container uses the requested order-list layout and displays the 
   assert.equal(container.components[0].content, [
     '_ _',
     '_ _       ──────────  <:0cpink_bow:1562803659190829126>  ──────────',
-    '_ _              ꒰  <:00_treat:1562793410157613156>  ꒱   **order**  __list__   !!',
-    '_ _                 ⚬  <#source-1> : <@customer-1> ticket owner',
-    '_ _                 ⚬  #DEKOR．Coffee (x1)',
+    '_ _              ꒰  <:00_treat:1562793410157613156>  ꒱   **order**  __queue__   !!',
+    '_ _                 ⚬  <#source-1> : <@customer-1>',
+    '_ _                 ⚬  Coffee．1',
     '_ _                 ⚬  paid via __Cash__',
-    '_ _                 ⚬  status   :   __noted__',
+    '_ _                 ⚬  status   :   __Noted__',
     '_ _         served by <@staff-1> <a:sweet_nom:1561070811773935797>',
     '_ _       ──────────  <a:pinkletter:1562804355856597092>  ──────────',
     '_ _',
@@ -325,8 +326,8 @@ test('new order container uses the requested order-list layout and displays the 
     paymentMethod: 'GCASH',
     sourceChannelId: 'source-2',
   }).toJSON();
-  assert.match(missingSupporter.components[0].content, /<#source-2> : Unknown buyer ticket owner/);
-  assert.match(missingSupporter.components[0].content, /Unknown item|#ORDER-3．Tea \(x2\)/);
+  assert.match(missingSupporter.components[0].content, /<#source-2> : Unknown buyer/);
+  assert.match(missingSupporter.components[0].content, /Tea．2/);
   assert.match(missingSupporter.components[0].content, /served by Not assigned/);
 });
 
@@ -343,9 +344,9 @@ test('order container includes item quantity and status styling', () => {
     sourceChannelId: 'source-1',
   }).toJSON();
 
-  assert.match(container.components[0].content, /<#source-1> : <@customer-1> ticket owner/);
-  assert.match(container.components[0].content, /#ORDER-9．Coffee \(x7\)/);
-  assert.match(container.components[0].content, /status   :   __processing__/);
+  assert.match(container.components[0].content, /<#source-1> : <@customer-1>/);
+  assert.match(container.components[0].content, /Coffee．7/);
+  assert.match(container.components[0].content, /status   :   __Processing__/);
   assert.match(container.components[0].content, /served by <@staff-1>/);
 });
 
@@ -353,16 +354,20 @@ test('vouch embed omits warranty text and shows the date in Philippine time', ()
   const date = new Date('2024-01-01T00:00:00Z');
   const embed = require('../src/embeds').vouchEmbed({ id: 'user-1' }, 'Coffee', 'Great service', date).toJSON();
 
-  const expected = new Intl.DateTimeFormat('en-US', {
+  const expectedDate = new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'long',
     day: '2-digit',
+    timeZone: 'Asia/Manila',
+  }).format(date);
+  const expectedTime = new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     timeZone: 'Asia/Manila',
     timeZoneName: 'short',
   }).format(date);
-  assert.ok(embed.description.includes(`date vouched  :  ${expected}`));
+  assert.ok(embed.description.includes(`date vouched  :  ${expectedDate}`));
+  assert.ok(embed.description.includes(`time vouched  :  ${expectedTime}`));
   assert.match(embed.description, /buyer  :  <@user-1>/);
   assert.match(embed.description, /item  :  Coffee/);
   assert.match(embed.description, /feedback  :  Great service/);

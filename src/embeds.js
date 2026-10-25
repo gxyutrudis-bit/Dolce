@@ -23,25 +23,19 @@ const LABELS = { pending: 'Waiting', claimed: 'In progress', completed: 'Complet
 const SHOP_ANNOUNCEMENT_ROLE_ID = '1555603985694588940';
 
 function orderContainer(order) {
-  const status = order.status === 'completed'
-    ? 'done'
-    : order.status === 'cancelled'
-      ? 'cancelled'
-      : order.status === 'expired'
-        ? 'expired'
-        : order.processingStatus === 'processing' ? 'processing' : 'noted';
+  const status = orderStatusLabel(order);
   const sourceChannel = order.sourceChannelId ? `<#${order.sourceChannelId}>` : 'Unknown channel';
   const buyer = order.customerId ? `<@${order.customerId}>` : 'Unknown buyer';
   const servedBy = order.supporterId ? `<@${order.supporterId}>` : 'Not assigned';
-  const item = order.items ?? order.item;
+  const item = order.items ?? order.item ?? 'Unknown item';
   const quantity = order.quantity ?? 1;
   return new ContainerBuilder()
     .addTextDisplayComponents(new TextDisplayBuilder().setContent([
       '_ _',
       '_ _       ──────────  <:0cpink_bow:1562803659190829126>  ──────────',
-      '_ _              ꒰  <:00_treat:1562793410157613156>  ꒱   **order**  __list__   !!',
-      `_ _                 ⚬  ${sourceChannel} : ${buyer} ticket owner`,
-      `_ _                 ⚬  #${orderReference(order)}．${item ?? 'Unknown item'} (x${quantity})`,
+      '_ _              ꒰  <:00_treat:1562793410157613156>  ꒱   **order**  __queue__   !!',
+      `_ _                 ⚬  ${sourceChannel} : ${buyer}`,
+      `_ _                 ⚬  ${item}．${quantity}`,
       `_ _                 ⚬  paid via __${order.paymentMethod ?? 'Not specified'}__`,
       `_ _                 ⚬  status   :   __${status}__`,
       `_ _         served by ${servedBy} <a:sweet_nom:1561070811773935797>`,
@@ -325,6 +319,9 @@ function vouchEmbed(user, items, feedback, vouchedAt = new Date()) {
     year: 'numeric',
     month: 'long',
     day: '2-digit',
+    timeZone: 'Asia/Manila',
+  }).format(vouchedAt);
+  const time = new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     timeZone: 'Asia/Manila',
@@ -340,6 +337,7 @@ function vouchEmbed(user, items, feedback, vouchedAt = new Date()) {
       '_ _',
       `_ _ ⚬  item  :  ${items}`,
       `_ _ ⚬  date vouched  :  ${date}`,
+      `_ _ ⚬  time vouched  :  ${time}`,
       `_ _ ⚬  feedback  :  ${feedback}`,
       '_ _ ⚬  proof  :  see the attached image.',
       '_ _',
@@ -479,8 +477,8 @@ function queueConfirmationMessage(order) {
     '_ _',
     '_ _       ──────────  <:0cpink_bow:1562803659190829126>  ──────────',
     '_ _              ꒰  <:00_treat:1562793410157613156>  ꒱   **order**  __queue__   !!',
-    `_ _                 ⚬  ${ticket}  :  ${buyer} ticket owner`,
-    `_ _                 ⚬  #${orderReference(order)}．${item} ${order.quantity ?? 1}`,
+    `_ _                 ⚬  ${ticket}  :  ${buyer}`,
+    `_ _                 ⚬  ${item}．${order.quantity ?? 1}`,
     `_ _                 ⚬  paid via __${order.paymentMethod ?? 'Not specified'}__`,
     `_ _                 ⚬  status   :   __${orderStatusLabel(order)}__`,
     `_ _         served by ${supporter} <a:sweet_nom:1561070811773935797>`,
