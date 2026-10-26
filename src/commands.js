@@ -148,15 +148,12 @@ module.exports = [
     .setDescription('Claim the next waiting order.'),
   new SlashCommandBuilder()
     .setName('solving')
-    .setDescription('Multiply two numbers.')
-    .addNumberOption((option) => option
-      .setName('amount_one')
-      .setDescription('First amount')
-      .setRequired(true))
-    .addNumberOption((option) => option
-      .setName('amount_two')
-      .setDescription('Second amount')
-      .setRequired(true)),
+    .setDescription('Calculate an expression using +, -, *, and parentheses.')
+    .addStringOption((option) => option
+      .setName('expression')
+      .setDescription('Arithmetic expression, such as 159+(83*3)')
+      .setRequired(true)
+      .setMaxLength(256)),
   new SlashCommandBuilder()
     .setName('message')
     .setDescription('Post a message as the bot.')

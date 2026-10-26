@@ -26,6 +26,7 @@ function orderContainer(order) {
   const status = orderStatusLabel(order);
   const sourceChannel = order.sourceChannelId ? `<#${order.sourceChannelId}>` : 'Unknown channel';
   const buyer = order.customerId ? `<@${order.customerId}>` : 'Unknown buyer';
+  const buyerUsername = order.customerUsername ? `@${order.customerUsername}` : 'Unknown buyer';
   const servedBy = order.supporterId ? `<@${order.supporterId}>` : 'Not assigned';
   const item = order.items ?? order.item ?? 'Unknown item';
   const quantity = order.quantity ?? 1;
@@ -34,6 +35,7 @@ function orderContainer(order) {
       '_ _',
       '_ _       ──────────  <:0cpink_bow:1562803659190829126>  ──────────',
       '_ _              ꒰  <:00_treat:1562793410157613156>  ꒱   **order**  __queue__   !!',
+      `_ _                 ⚬  ${buyerUsername}`,
       `_ _                 ⚬  ${sourceChannel} : ${buyer}`,
       `_ _                 ⚬  ${item}．${quantity}`,
       `_ _                 ⚬  paid via __${order.paymentMethod ?? 'Not specified'}__`,
@@ -159,10 +161,23 @@ function voidedOrderMessage(user, product) {
     ].join('\n');
 }
 
-function multiplicationContainer({ amountOne, amountTwo, product }) {
+  function tipMessage(buyer, amount) {
+    return [
+      `_ _      <:purple_rawr:1561070840894722098>     :     ${buyer}`,
+      '',
+      `_ _         thank you for the tip !  ₱ ${amount}  <:purplestar:1557486696193335377>`,
+      '',
+      '            Grazie mille。。<a:Sweet_Heart:1561070894690992320>',
+    ].join('\n');
+  }
+
+function multiplicationContainer(calculation) {
+  const resultText = calculation.expression !== undefined
+    ? `${calculation.expression} = ${calculation.result}`
+    : `${calculation.amountOne} x ${calculation.amountTwo} = ${calculation.product}`;
   return new ContainerBuilder()
     .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`**${amountOne} x ${amountTwo} = ${product}**`),
+      new TextDisplayBuilder().setContent(`**${resultText}**`),
     );
 }
 
@@ -471,12 +486,14 @@ function queueEmbed(orders) {
 function queueConfirmationMessage(order) {
   const ticket = order.sourceChannelId ? `<#${order.sourceChannelId}>` : 'Unknown ticket';
   const buyer = order.customerId ? `<@${order.customerId}>` : 'Unknown buyer';
+  const buyerUsername = order.customerUsername ? `@${order.customerUsername}` : 'Unknown buyer';
   const supporter = order.supporterId ? `<@${order.supporterId}>` : 'Not assigned';
   const item = order.items ?? order.item ?? 'Unknown item';
   return [
     '_ _',
     '_ _       ──────────  <:0cpink_bow:1562803659190829126>  ──────────',
     '_ _              ꒰  <:00_treat:1562793410157613156>  ꒱   **order**  __queue__   !!',
+    `_ _                 ⚬  ${buyerUsername}`,
     `_ _                 ⚬  ${ticket}  :  ${buyer}`,
     `_ _                 ⚬  ${item}．${order.quantity ?? 1}`,
     `_ _                 ⚬  paid via __${order.paymentMethod ?? 'Not specified'}__`,
@@ -790,6 +807,7 @@ module.exports = {
   orderContainer,
   orderStatusEmbed,
   voidedOrderMessage,
+  tipMessage,
   orderCompletionReminderEmbed,
   multiplicationContainer,
   robuxFormContainer,

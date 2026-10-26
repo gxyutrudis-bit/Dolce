@@ -35,6 +35,7 @@ const {
   helpEmbed,
   queueEmbed,
   queueConfirmationMessage,
+  tipMessage,
   SHOP_ANNOUNCEMENT_ROLE_ID,
   dmsOrderMessage,
   dmsOrderFormModal,
@@ -78,7 +79,7 @@ const { parseOrderTicketForm } = require('./order-ticket-form');
 const { parseOrderVouchForm } = require('./order-vouch-form');
 const { parseOthersTicketForm } = require('./others-ticket-form');
 const { parseDmsOrderForm } = require('./dms-order-form');
-const { multiplyAmounts, multiplyExpression } = require('./multiplication');
+const { calculateExpression } = require('./multiplication');
 const { replyThenDeleteCommand } = require('./message-command-actions');
 const {
   sendV2,
@@ -1242,16 +1243,8 @@ async function handleCommand(interaction) {
 
     const amount = new Intl.NumberFormat('en-PH', { maximumFractionDigits: 2 })
       .format(interaction.options.getNumber('amount', true));
-    const tipEmoji = (name) => interaction.guild.emojis.cache
-      .find((emoji) => emoji.name === name)?.toString() ?? `:${name}:`;
-    const message = [
-      `_ _      ${tipEmoji('purple_rawr')}     :     <@${recipientId}>`,
-      `_ _         thank you for the tip !  ₱${amount}  ${tipEmoji('purplestar')}`,
-      `            Grazie mille。。${tipEmoji('emoji_30~2')}`,
-    ].join('\n\n');
-
     await sendV2(channel, {
-      content: message,
+      content: tipMessage(`<@${recipientId}>`, amount),
       allowedMentions: { parse: [], users: [recipientId] },
     });
     return interaction.editReply(`Tip message for <@${recipientId}> sent to ${channel}.`);
@@ -1334,9 +1327,11 @@ async function handleCommand(interaction) {
     }
     await interaction.deferReply({ ephemeral: true });
     const customerId = ticketCustomerId(interaction.channel, interaction.user.id);
+    const customer = await client.users.fetch(customerId).catch(() => null);
     const order = store.addOrder({
       guildId: interaction.guildId,
       customerId,
+      customerUsername: customer?.username,
       sourceChannelId: interaction.channelId,
       items: interaction.options.getString('items', true),
       paymentMethod: interaction.options.getString('payment_method', true),
@@ -1371,8 +1366,15 @@ async function handleCommand(interaction) {
         ephemeral: true,
       });
     }
-    return interaction.reply({
-      content: queueConfirmationMessage(order),
+    await interaction.deferReply();
+    const customer = order.customerUsername
+      ? null
+      : await client.users.fetch(order.customerId).catch(() => null);
+    return interaction.editReply({
+      content: queueConfirmationMessage({
+        ...order,
+        customerUsername: order.customerUsername ?? customer?.username,
+      }),
       allowedMentions: {
         users: [...new Set([order.customerId, order.supporterId].filter(Boolean))],
       },
@@ -1393,12 +1395,9 @@ async function handleCommand(interaction) {
   }
 
   if (interaction.commandName === 'solving') {
-    const result = multiplyAmounts(
-      interaction.options.getNumber('amount_one', true),
-      interaction.options.getNumber('amount_two', true),
-    );
+    const result = calculateExpression(interaction.options.getString('expression', true));
     if (!result) {
-      return interaction.reply({ content: 'The result is too large to calculate.', ephemeral: true });
+      return interaction.reply({ content: 'Enter a valid expression using numbers, `+`, `-`, `*`, and parentheses.', ephemeral: true });
     }
     return interaction.reply({
       components: [multiplicationContainer(result)],
@@ -1985,6 +1984,8 @@ async function handleButton(interaction) {
     flags: MessageFlags.IsComponentsV2,
     allowedMentions: { parse: [] },
   });
+  if (action === 'processing') return;
+
   const statusEmbed = orderStatusEmbed(order);
   const completionReminderEmbed = action === 'complete' ? orderCompletionReminderEmbed() : null;
   const notificationFailures = [];
@@ -2157,10 +2158,10 @@ client.on('messageCreate', async (message) => {
     }
     if (messageCommand?.name === 'calc') {
       const result = messageCommand.args.length
-        ? multiplyExpression(messageCommand.args.join(' '))
+        ? calculateExpression(messageCommand.args.join(' '))
         : null;
       if (!result) {
-        await message.reply('Usage: `,calc <number>*<number>` — enter two finite numbers separated by `*`.');
+        await message.reply('Usage: `,calc <expression>` — use numbers with `+`, `-`, `*`, and parentheses, for example `,calc 159+(83*3)`.');
         return;
       }
       const deleteError = await replyThenDeleteCommand(

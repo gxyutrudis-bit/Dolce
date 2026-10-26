@@ -27,8 +27,8 @@ Set the Railway service root directory to the repository root and clear any cust
 - `/queue` posts the latest order confirmation for the active ticket owner in the current ticket, including the buyer, item, quantity, payment method, and staff member who ran `/order`. Run `/order` in the ticket before `/queue`. `/queuelist` displays active orders in submission order with quantity, preparer, and buyer.
 - `/claim` lets authorized staff claim the oldest waiting order.
 - `/payment` lets authorized staff send the payment reminder in an active ticket.
-- `/solving amount_one:<number> amount_two:<number>` multiplies two numbers and displays the result.
-- `,calc <number>*<number>` (for example, `,calc 5*5`) sends the result as `5 x 5 = 25` in a Discord Components V2 container, then deletes the command message. The bot needs the **Manage Messages** permission in that channel. The `/solving` slash command remains available.
+- `/solving expression:<expression>` calculates an expression using `+`, `-`, `*`, and parentheses, then displays the result.
+- `,calc <expression>` (for example, `,calc 159+(83*3)`) calculates using `+`, `-`, `*`, and parentheses, sends the expression and result in a Discord Components V2 container, then deletes the command message. The bot needs the **Manage Messages** permission in that channel. The `/solving` slash command accepts the same expressions.
 - `/message text:<message> channel:<optional>` lets authorized staff post a message as the bot in the current or selected text channel, using a colorless Discord Components V2 container. Mentions are not triggered.
 - `/robuxform` lets authorized staff post the Robux fill-up form in the current channel as a colorless Discord Components V2 container.
 - `/robuxavail` lets authorized staff post the Robux Via Plus availability and price list in the current channel, with no extra command confirmation message.

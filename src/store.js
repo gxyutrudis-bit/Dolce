@@ -240,13 +240,14 @@ class OrderStore {
     return stickyMessage;
   }
 
-  addOrder({ guildId, customerId, sourceChannelId, items, paymentMethod, supporterId, preparedById, quantity, ticketProduct }) {
+  addOrder({ guildId, customerId, customerUsername, sourceChannelId, items, paymentMethod, supporterId, preparedById, quantity, ticketProduct }) {
     const state = this.read();
     const order = {
       id: randomUUID().toUpperCase(),
       ...(ticketProduct ? { ticketProduct } : {}),
       guildId,
       customerId,
+      ...(customerUsername ? { customerUsername } : {}),
       sourceChannelId,
       items,
       paymentMethod,

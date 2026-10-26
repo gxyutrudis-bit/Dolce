@@ -26,6 +26,7 @@ const {
   dmsOrderFormButtons,
   vouchReminderContainer,
   vouchFormModal,
+  tipMessage,
 } = require('../src/embeds');
 const commands = require('../src/commands');
 const { ticketChannelName } = require('../src/ticket-names');
@@ -51,7 +52,7 @@ const { voidedOrderMessage } = require('../src/embeds');
 const { parseOrderTicketForm } = require('../src/order-ticket-form');
 const { parseOthersTicketForm } = require('../src/others-ticket-form');
 const { parseDmsOrderForm } = require('../src/dms-order-form');
-const { multiplyAmounts, multiplyExpression } = require('../src/multiplication');
+const { multiplyAmounts, calculateExpression } = require('../src/multiplication');
 const { sendThenDeleteCommand } = require('../src/message-command-actions');
 const { setVoidedRole } = require('../src/voided-role');
 
@@ -473,22 +474,23 @@ test('vouch preview offers confirm and change actions', () => {
   ]);
 });
 
-test('/solving is registered with two required numeric amounts', () => {
+test('/solving is registered with one required expression option', () => {
   const command = commands.find((entry) => entry.name === 'solving');
   assert.ok(command);
   assert.deepEqual(
     command.options.map(({ name, type, required }) => ({ name, type, required })),
-    [
-      { name: 'amount_one', type: 10, required: true },
-      { name: 'amount_two', type: 10, required: true },
-    ],
+    [{ name: 'expression', type: 3, required: true }],
   );
 });
 
-test('calc shortcut parses a single multiplication expression', () => {
+test('calc shortcut accepts a parenthesized expression with spaces', () => {
   assert.deepEqual(parseTicketMessageCommand(',calc 5*5'), {
     name: 'calc',
     args: ['5*5'],
+  });
+  assert.deepEqual(parseTicketMessageCommand(',calc 159 + (83 * 3)'), {
+    name: 'calc',
+    args: ['159', '+', '(83', '*', '3)'],
   });
   assert.deepEqual(parseTicketMessageCommand(',calc'), {
     name: 'calc',
@@ -497,7 +499,7 @@ test('calc shortcut parses a single multiplication expression', () => {
   assert.equal(parseTicketMessageCommand(',solving 5*5'), null);
 });
 
-test('multiplication handles finite numbers and rejects invalid values or overflow', () => {
+test('arithmetic parser handles precedence, parentheses, unary signs, and invalid input', () => {
   assert.deepEqual(multiplyAmounts('2.5', '-4'), {
     amountOne: 2.5,
     amountTwo: -4,
@@ -511,25 +513,32 @@ test('multiplication handles finite numbers and rejects invalid values or overfl
   assert.equal(multiplyAmounts('not-a-number', '3'), null);
   assert.equal(multiplyAmounts('1e309', '2'), null);
   assert.equal(multiplyAmounts(Number.MAX_VALUE, 2), null);
-  assert.deepEqual(multiplyExpression('5*5'), {
-    amountOne: 5,
-    amountTwo: 5,
-    product: 25,
+  assert.deepEqual(calculateExpression('159+(83*3)'), {
+    expression: '159+(83*3)',
+    result: 408,
   });
-  assert.deepEqual(multiplyExpression('-2.5 * 4'), {
-    amountOne: -2.5,
-    amountTwo: 4,
-    product: -10,
+  assert.deepEqual(calculateExpression('10 - 2*3'), {
+    expression: '10 - 2*3',
+    result: 4,
   });
-  assert.equal(multiplyExpression('5**5'), null);
-  assert.equal(multiplyExpression('5*x'), null);
+  assert.deepEqual(calculateExpression('(10-2)*3'), {
+    expression: '(10-2)*3',
+    result: 24,
+  });
+  assert.deepEqual(calculateExpression('-2.5 * +4'), {
+    expression: '-2.5 * +4',
+    result: -10,
+  });
+  for (const expression of ['5**5', '5*x', '5+', '(2+3', '2+3)', '2(3)', '1e309', '1e308*10']) {
+    assert.equal(calculateExpression(expression), null, expression);
+  }
 });
 
-test('multiplication result is formatted as a colorless V2 container', () => {
-  const container = multiplicationContainer(multiplyExpression('5*5')).toJSON();
+test('expression result is formatted as a colorless V2 container', () => {
+  const container = multiplicationContainer(calculateExpression('159+(83*3)')).toJSON();
   assert.equal(container.accent_color, undefined);
   assert.deepEqual(container.components, [
-    { type: 10, content: '**5 x 5 = 25**' },
+    { type: 10, content: '**159+(83*3) = 408**' },
   ]);
 });
 
@@ -587,6 +596,16 @@ test('payment reminder V2 container supports servers without a custom icon', () 
       '_ _ ─────────────  <:purplecupcake:1557485583960379402>  ─────────────',
     ].join('\n'),
   );
+});
+
+test('/tip send message uses the requested custom emojis and layout', () => {
+  assert.equal(tipMessage('<@buyer-1>', '250'), [
+    '_ _      <:purple_rawr:1561070840894722098>     :     <@buyer-1>',
+    '',
+    '_ _         thank you for the tip !  ₱ 250  <:purplestar:1557486696193335377>',
+    '',
+    '            Grazie mille。。<a:Sweet_Heart:1561070894690992320>',
+  ].join('\n'));
 });
 
 test('vouch embed matches the order-details layout and Philippine time zone', () => {
