@@ -22,39 +22,54 @@ const { orderReference } = require('./order-reference');
 const LABELS = { pending: 'Waiting', claimed: 'In progress', completed: 'Completed', cancelled: 'Cancelled', expired: 'Expired' };
 const SHOP_ANNOUNCEMENT_ROLE_ID = '1555603985694588940';
 
-function orderContainer(order) {
+function orderQueueText(order) {
   const status = orderStatusLabel(order);
-  const sourceChannel = order.sourceChannelId ? `<#${order.sourceChannelId}>` : 'Unknown channel';
+  const ticket = order.sourceChannelId ? `<#${order.sourceChannelId}>` : 'Unknown ticket';
   const buyer = order.customerId ? `<@${order.customerId}>` : 'Unknown buyer';
-  const buyerUsername = order.customerUsername ? `@${order.customerUsername}` : 'Unknown buyer';
-  const servedBy = order.supporterId ? `<@${order.supporterId}>` : 'Not assigned';
-  const item = order.items ?? order.item ?? 'Unknown item';
-  const quantity = order.quantity ?? 1;
-  return new ContainerBuilder()
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent([
+  const ticketHandler = order.supporterId ? `<@${order.supporterId}>` : 'Not assigned';
+  return [
       '_ _',
       '_ _       ──────────  <:0cpink_bow:1562803659190829126>  ──────────',
       '_ _              ꒰  <:00_treat:1562793410157613156>  ꒱   **order**  __queue__   !!',
-      `_ _                 ⚬  ${buyerUsername}`,
-      `_ _                 ⚬  ${sourceChannel} : ${buyer}`,
-      `_ _                 ⚬  ${item}．${quantity}`,
+      `_ _                 ⚬  ${ticket}  :  ${buyer}`,
+      `_ _                 ⚬  ${order.items ?? order.item ?? 'Unknown item'}．${order.quantity ?? 1}`,
       `_ _                 ⚬  paid via __${order.paymentMethod ?? 'Not specified'}__`,
       `_ _                 ⚬  status   :   __${status}__`,
-      `_ _         served by ${servedBy} <a:sweet_nom:1561070811773935797>`,
+      `_ _                  served by ${ticketHandler} <a:sweet_nom:1561070811773935797>`,
       '_ _       ──────────  <a:pinkletter:1562804355856597092>  ──────────',
       '_ _',
-    ].join('\n')))
+    ].join('\n');
+}
+
+function orderMessagePayload(order) {
+  return {
+    content: orderQueueText(order),
+    components: [orderButtons(order)],
+    allowedMentions: { parse: [] },
+  };
+}
+
+function orderContainer(order) {
+  return new ContainerBuilder()
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(orderQueueText(order)))
     .addActionRowComponents(orderButtons(order));
 }
 
 function orderTicketTermsContainer(accepted = false) {
   return new ContainerBuilder()
     .addTextDisplayComponents(new TextDisplayBuilder().setContent([
-      "🧁 𔘓 ֹ **dolce vita's terms of service** 𓂅 ̼",
-      'all sweeties bought are final and non-refundable.',
-      '◞◟　𓎟𓎟　 ✦　　𓎟𓎟　　◞◟　𓎟𓎟',
-      '» Force refunds are not accepted.',
-      '» No cancellation or requesting refunds when order status is processing.',
+      '_ _',
+      '_ _ ` 🧁 `  **dσlc𝚎 vιtα’s** __t𝚎rm σf s𝚎rvιc𝚎__  ʚଓ',
+      '_ _ αll   sweeties   bought   αre   finαl   αnd',
+      '_ _ cαnnot    be    refunded.',
+      '_ _',
+      '_ _ ─ ─ ─ ─ ─ ─ ─ ─    ⪩𓋰⪨    ─ ─ ─ ─ ─ ─ ─ ─',
+      '_ _',
+      '_ _ ⚬  0-1d proc, please no rushing of orders.',
+      '_ _ ⚬  force     refunds    are    not    accepted.',
+      '_ _ ⚬  once   order   is   being   processed,  no',
+      '_ _ cancellation   or   refund   request.',
+      '_ _',
     ].join('\n')))
     .addActionRowComponents(new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -74,12 +89,8 @@ function vouchLinkButton(guildId, ticketChannelId) {
 
 function vouchReminderContainer(guildId, ticketChannelId) {
   const reminder = orderCompletionReminderEmbed().toJSON();
-  const description = reminder.description.replace(
-    '› VOUCH IN YOUR ACTIVE ORDER TICKET.',
-    '› CLICK “Vouch now” TO VOUCH DOLCE VITA.',
-  );
   return new ContainerBuilder()
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(description))
+    .addTextDisplayComponents(new TextDisplayBuilder().setContent(reminder.description))
     .addActionRowComponents(vouchLinkButton(guildId, ticketChannelId));
 }
 
@@ -163,11 +174,12 @@ function voidedOrderMessage(user, product) {
 
   function tipMessage(buyer, amount) {
     return [
-      `_ _      <:purple_rawr:1561070840894722098>     :     ${buyer}`,
-      '',
-      `_ _         thank you for the tip !  ₱ ${amount}  <:purplestar:1557486696193335377>`,
-      '',
-      '            Grazie mille。。<a:Sweet_Heart:1561070894690992320>',
+      `_ _ ${'<:Kurtina:1566436939979296848>'.repeat(12)}`,
+      '_ _              ꮺ  <:00_treat:1562793410157613156>  **tip  tip  tip  !**    ࣪    ⊹',
+      '_ _',
+      `_ _    ${amount}   tip   from   ${buyer}`,
+      '_ _    thank   you   for   your   sugar  tip!',
+      `_ _ ${'<:Bandage:1566436975416844298>'.repeat(12)}`,
     ].join('\n');
   }
 
@@ -372,27 +384,25 @@ function warrantyActivatedContainer(user, items, vouchedAt = new Date()) {
   }).format(vouchedAt).replace('GMT+8', 'PHT (UTC+8)');
   const userId = user?.id ?? 'unknown';
   return new ContainerBuilder()
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent(
-      '<:blank:1557365898216611841> <a:vitacheck:1557378165457027072> **WARRANTY ACTIVATED *!***',
-    ))
     .addTextDisplayComponents(new TextDisplayBuilder().setContent([
-      '› applies only to (nitro, premium subs, svboosts)',
-      '› you may ignore this if you purchased discord items',
-      '› present this if your item gets **revoked**',
-      '',
-      '-# Deleting this message will automatically void the warranty',
-    ].join('\n')))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent('━━━━━━━━━━━━━━━━━━━━━━━━━━━━'))
-    .addTextDisplayComponents(new TextDisplayBuilder().setContent([
-      '<:blank:1557365898216611841> 🍩 **order details**',
-      '',
-      '🔹 **buyer:**',
-      `> <@${userId}>`,
-      '🔹 **item:**',
-      `> ${items}`,
-      '🔹 **date vouched:**',
-      `> ${date}`,
-      '🔹 **proof:**',
+      '### _ _             warranty  activated   <:0cpink_bow:1562803659190829126>',
+      '_ _',
+      '_ _ ⚬  applied  only  to  ntro, prems, and svb.',
+      '_ _ ⚬  you  may  ignore  this if you purchased',
+      '_ _ dc   items.',
+      '_ _ ⚬  present this if your item gets revoked.',
+      '_ _',
+      '-# _ _ deleting   this   message   will   automatically',
+      '-# _ _ void    the    warranty.',
+      '_ _',
+      '_ _ ─ ─ ─ ─ ─ ─ ─ ─ ─    ⪩𓋰⪨    ─ ─ ─ ─ ─ ─ ─ ─ ─',
+      '_ _',
+      '_ _  __order details__  <:00_treat:1562793410157613156>',
+      '_ _',
+      `_ _ ꒰ buyer ꒱  :  <@${userId}>`,
+      `_ _ ꒰ item ꒱  :  ${items}`,
+      `_ _ ꒰ date vouched ꒱  :  ${date}`,
+      '_ _ ꒰ proof ꒱  :',
     ].join('\n')))
     .addMediaGalleryComponents(new MediaGalleryBuilder().addItems(
       new MediaGalleryItemBuilder().setURL('attachment://vouch-proofs.png'),
@@ -403,12 +413,21 @@ function orderCompletionReminderEmbed() {
   return new EmbedBuilder()
     .setColor(0x35a16b)
     .setDescription([
-      '**REMINDERS : WARRANTY POLICY!!**',
-      '› All completed orders come with a 12-hours warranty.',
-      '› Replacements will only be provided for verified issues covered by warranty.',
-      '› Once the warranty expires, the shop is no longer responsible for issues covered by the expired warranty.',
-      '› NO VOUCH = no refund, no replacement & no warranty.',
-      '› VOUCH IN YOUR ACTIVE ORDER TICKET.',
+      '_ _',
+      '_ _   __reminders__  :  **wαrrαnty  policy !!**  <:e_bread:1562794379796684890>',
+      '_ _',
+      '_ _ ⚬ all  completed  orders  come  with a 12',
+      '_ _ hours   warranty.',
+      '_ _ ⚬ replacements   will  only   be   provided',
+      '_ _ for  verified  issues  covered by warranty.',
+      '_ _ ⚬ once  warranty  is  expired,  the shop is',
+      '_ _ no  longer responsible for issues covered',
+      '_ _ by   the   expired   warranty.',
+      '_ _ ⚬ **NO  VOUCH**  =  no  refund  and item will',
+      '_ _ not   be   provided   with   a   replacement.',
+      '_ _ warranty   will   also   be   voided.',
+      '_ _ ⚬ type  __/vouch__  to vouch  **𝓓olce 𝓥ita** !',
+      '_ _',
     ].join('\n'));
 }
 
@@ -484,24 +503,7 @@ function queueEmbed(orders) {
 }
 
 function queueConfirmationMessage(order) {
-  const ticket = order.sourceChannelId ? `<#${order.sourceChannelId}>` : 'Unknown ticket';
-  const buyer = order.customerId ? `<@${order.customerId}>` : 'Unknown buyer';
-  const buyerUsername = order.customerUsername ? `@${order.customerUsername}` : 'Unknown buyer';
-  const supporter = order.supporterId ? `<@${order.supporterId}>` : 'Not assigned';
-  const item = order.items ?? order.item ?? 'Unknown item';
-  return [
-    '_ _',
-    '_ _       ──────────  <:0cpink_bow:1562803659190829126>  ──────────',
-    '_ _              ꒰  <:00_treat:1562793410157613156>  ꒱   **order**  __queue__   !!',
-    `_ _                 ⚬  ${buyerUsername}`,
-    `_ _                 ⚬  ${ticket}  :  ${buyer}`,
-    `_ _                 ⚬  ${item}．${order.quantity ?? 1}`,
-    `_ _                 ⚬  paid via __${order.paymentMethod ?? 'Not specified'}__`,
-    `_ _                 ⚬  status   :   __${orderStatusLabel(order)}__`,
-    `_ _         served by ${supporter} <a:sweet_nom:1561070811773935797>`,
-    '_ _       ──────────  <a:pinkletter:1562804355856597092>  ──────────',
-    '_ _',
-  ].join('\n');
+  return orderQueueText(order);
 }
 
 function dmsOrderMessage(orders) {
@@ -585,6 +587,15 @@ function orderTicketModal() {
       ),
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
+          .setCustomId('ticket-price')
+          .setLabel('PRICE')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(100)
+          .setPlaceholder('e.g. ₱ 100'),
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
           .setCustomId('ticket-quantity')
           .setLabel('QUANTITY')
           .setStyle(TextInputStyle.Short)
@@ -654,18 +665,30 @@ function othersTicketModal() {
 }
 
 function ticketEmbed(type, user, orderForm, reportForm, othersForm) {
+  if (orderForm) {
+    return new EmbedBuilder()
+      .setColor(0x3478c7)
+      .setDescription([
+        '## _ _ σrd𝚎r⸺tιck𝚎t   ( <:pink_phone:1562813781996998656> )',
+        '_ _ hello! a staff member will be with',
+        '_ _ you   shortly.  please   don’t  spam',
+        '_ _ pings,   and   strictly   no   rushing.',
+        '_ _',
+        '_ _ <:sweets_candy:1561070771093119106>  —  **order  details  !**',
+        '_ _',
+        `_ _ \` product  \`  :  ${orderForm.product}`,
+        `_ _ \`  price   \`  :  ${orderForm.price}`,
+        `_ _ \` quantity \`  :  ${orderForm.quantity}`,
+        `_ _ \`   mop    \`  :  ${orderForm.paymentMethod}`,
+        '_ _',
+      ].join('\n'));
+  }
+
   const embed = new EmbedBuilder()
     .setColor(0x3478c7)
     .setTitle(`${type.toUpperCase()} TICKET`)
     .setDescription(`Hello <@${user.id}>. A staff member will be with you shortly.`);
 
-  if (orderForm) {
-    embed.addFields(
-      { name: 'PRODUCT', value: orderForm.product },
-      { name: 'QUANTITY', value: orderForm.quantity },
-      { name: 'PAYMENT METHOD', value: orderForm.paymentMethod },
-    );
-  }
   if (reportForm) {
     embed.addFields(
       { name: 'WHAT IS THE PRODUCT YOU BOUGHT?', value: reportForm.product },
@@ -805,6 +828,7 @@ function ticketTranscriptEmbed({
 module.exports = {
   orderButtons,
   orderContainer,
+  orderMessagePayload,
   orderStatusEmbed,
   voidedOrderMessage,
   tipMessage,

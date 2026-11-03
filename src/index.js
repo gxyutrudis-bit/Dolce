@@ -14,6 +14,7 @@ const { OrderStore, ORDER_ACTIVE_DURATION_MS, VOUCH_WINDOW_MS } = require('./sto
 const {
   orderButtons,
   orderContainer,
+  orderMessagePayload,
   orderStatusEmbed,
   orderCompletionReminderEmbed,
   multiplicationContainer,
@@ -83,6 +84,8 @@ const { calculateExpression } = require('./multiplication');
 const { replyThenDeleteCommand } = require('./message-command-actions');
 const {
   sendV2,
+  standardPayload,
+  v2Payload,
   wrapInteractionResponses,
   wrapMessageResponses,
 } = require('./v2-messages');
@@ -157,18 +160,8 @@ async function getEligibleVouchTicket(guildId, ticketChannelId, userId) {
 }
 
 async function getEligibleVoidedVouchOrder(guildId, userId, ticketChannelId) {
-  const orders = store.listVoidedOrdersForVouch(guildId, userId)
-    .filter((order) => !ticketChannelId || order.sourceChannelId === ticketChannelId);
-  for (const order of orders) {
-    try {
-      const channel = await client.channels.fetch(order.sourceChannelId, { force: true });
-      if (!channel) return order;
-    } catch (error) {
-      if (error.code === 10003 || error.status === 404) return order;
-      throw error;
-    }
-  }
-  return null;
+  return store.listVoidedOrdersForVouch(guildId, userId)
+    .find((order) => !ticketChannelId || order.sourceChannelId === ticketChannelId) ?? null;
 }
 
 async function prepareVouchPreview(interaction, {
@@ -966,11 +959,15 @@ async function refreshOrderMessage(order) {
   if (!order.channelId || !order.messageId) return;
   const channel = await client.channels.fetch(order.channelId);
   const message = await channel.messages.fetch(order.messageId);
-  await message.edit({
-    components: [orderContainer(order)],
-    flags: MessageFlags.IsComponentsV2,
-    allowedMentions: { parse: [] },
-  });
+  if (message.flags.has(MessageFlags.IsComponentsV2)) {
+    await message.edit({
+      components: [orderContainer(order)],
+      flags: MessageFlags.IsComponentsV2,
+      allowedMentions: { parse: [] },
+    });
+  } else {
+    await message.edit(v2Payload(standardPayload(orderMessagePayload(order))));
+  }
 }
 
 async function deleteStickyPost(channel, messageId) {
@@ -1088,11 +1085,14 @@ async function createTicketChannel(interaction, type, orderForm, reportForm, oth
       ticketChannelTopic(interaction.user.id, type, orderForm),
       `${type} ticket metadata for ${interaction.user.tag}`,
     );
-    await sendV2(channel, {
+    const ticketMessagePayload = {
       ...ticketManagerMentionPayload(settings),
       embeds: [ticketEmbed(type, interaction.user, orderForm, reportForm, othersForm)],
       components: [ticketButtons()],
-    });
+    };
+    await sendV2(channel, type === 'order'
+      ? standardPayload(ticketMessagePayload)
+      : ticketMessagePayload);
     if (type === 'order') {
       await sendV2(channel, {
         components: [orderTicketTermsContainer()],
@@ -1327,11 +1327,9 @@ async function handleCommand(interaction) {
     }
     await interaction.deferReply({ ephemeral: true });
     const customerId = ticketCustomerId(interaction.channel, interaction.user.id);
-    const customer = await client.users.fetch(customerId).catch(() => null);
     const order = store.addOrder({
       guildId: interaction.guildId,
       customerId,
-      customerUsername: customer?.username,
       sourceChannelId: interaction.channelId,
       items: interaction.options.getString('items', true),
       paymentMethod: interaction.options.getString('payment_method', true),
@@ -1341,11 +1339,7 @@ async function handleCommand(interaction) {
       ticketProduct: await ticketProduct(interaction.channel),
     });
     const channel = await client.channels.fetch(orderChannelId);
-    const message = await sendV2(channel, {
-      components: [orderContainer(order)],
-      flags: MessageFlags.IsComponentsV2,
-      allowedMentions: { parse: [] },
-    });
+    const message = await sendV2(channel, standardPayload(orderMessagePayload(order)));
     store.setOrderMessage(order.id, channel.id, message.id);
     scheduleOrderExpiration(store.getOrder(order.id));
     return interaction.editReply(`Order #${orderReference(order)} was added to ${channel}.`);
@@ -1367,14 +1361,8 @@ async function handleCommand(interaction) {
       });
     }
     await interaction.deferReply();
-    const customer = order.customerUsername
-      ? null
-      : await client.users.fetch(order.customerId).catch(() => null);
     return interaction.editReply({
-      content: queueConfirmationMessage({
-        ...order,
-        customerUsername: order.customerUsername ?? customer?.username,
-      }),
+      content: queueConfirmationMessage(order),
       allowedMentions: {
         users: [...new Set([order.customerId, order.supporterId].filter(Boolean))],
       },
@@ -1636,11 +1624,11 @@ async function handleCommand(interaction) {
     const settings = store.getSettings(interaction.guildId);
     if (interaction.channelId === settings?.voidVouchChannelId) {
       if (!hasVoidedRole(settings, (roleId) => memberHasRole(interaction, roleId))) {
-        return interaction.reply({ content: 'Only customers with a voided order can vouch in this channel.', ephemeral: true });
+        return interaction.reply({ content: 'Only members with the configured voided role can vouch in this channel.', ephemeral: true });
       }
       const order = await getEligibleVoidedVouchOrder(interaction.guildId, interaction.user.id);
       if (!order) {
-        return interaction.reply({ content: 'No closed, voided order is available for a vouch.', ephemeral: true });
+        return interaction.reply({ content: 'No unvouched voided order is available for a vouch.', ephemeral: true });
       }
       const submittedItems = interaction.options.getString('items', true).trim();
       const feedback = interaction.options.getString('feedback', true).trim();
@@ -1953,6 +1941,7 @@ async function handleTicketModal(interaction) {
 
   const submittedOrderForm = {
     product: interaction.fields.getTextInputValue('ticket-product').trim(),
+    price: interaction.fields.getTextInputValue('ticket-price').trim(),
     quantity: interaction.fields.getTextInputValue('ticket-quantity').trim(),
     paymentMethod: interaction.fields.getTextInputValue('ticket-payment-method').trim(),
   };
@@ -1979,11 +1968,15 @@ async function handleButton(interaction) {
   if (!order || order.guildId !== interaction.guildId) {
     return interaction.reply({ content: 'This order is no longer active.', ephemeral: true });
   }
-  await interaction.update({
-    components: [orderContainer(order)],
-    flags: MessageFlags.IsComponentsV2,
-    allowedMentions: { parse: [] },
-  });
+  if (interaction.message.flags.has(MessageFlags.IsComponentsV2)) {
+    await interaction.update({
+      components: [orderContainer(order)],
+      flags: MessageFlags.IsComponentsV2,
+      allowedMentions: { parse: [] },
+    });
+  } else {
+    await interaction.update(standardPayload(orderMessagePayload(order)));
+  }
   if (action === 'processing') return;
 
   const statusEmbed = orderStatusEmbed(order);
@@ -2014,10 +2007,10 @@ async function handleButton(interaction) {
         allowedMentions: { parse: [] },
       });
       if (completionReminderEmbed) {
-        await sendV2(sourceChannel, {
+        await sendV2(sourceChannel, standardPayload({
           embeds: [completionReminderEmbed],
           allowedMentions: { parse: [] },
-        });
+        }));
       }
     } catch (error) {
       console.error(`Could not send status update for order ${order.id} to source channel ${order.sourceChannelId}:`, error);

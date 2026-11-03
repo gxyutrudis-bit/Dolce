@@ -3,11 +3,15 @@ const PAYMENT_METHODS = new Set(['GCASH', 'BANKTRANS', 'PAYMAYA']);
 
 function parseOrderTicketForm(form) {
   const product = form.product.trim().toUpperCase();
+  const price = form.price.trim();
   const quantity = form.quantity.trim();
   const paymentMethod = form.paymentMethod.trim().toUpperCase();
 
   if (!PRODUCTS.has(product)) {
     return { error: 'PRODUCT must be DEKOR, BOBUX, SVBOWCH, PREMS, NAYTRO, or GCRED1TS.' };
+  }
+  if (!price) {
+    return { error: 'PRICE cannot be blank.' };
   }
   if (!/^\d{1,4}$/.test(quantity) || Number(quantity) < 1 || Number(quantity) > 9999) {
     return { error: 'QUANTITY must be a whole number from 1 to 9999.' };
@@ -19,6 +23,7 @@ function parseOrderTicketForm(form) {
   return {
     value: {
       product,
+      price,
       quantity: String(Number(quantity)),
       paymentMethod,
     },

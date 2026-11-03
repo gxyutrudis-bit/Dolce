@@ -63,7 +63,7 @@ test('ticket panel contains only the three requested buttons', () => {
   assert.equal(buttons[0].style, buttons[2].style);
 });
 
-test('order ticket modal requires the product, quantity, and payment method fields', () => {
+test('order ticket modal requires the product, price, quantity, and payment method fields', () => {
   const modal = orderTicketModal().toJSON();
   assert.equal(modal.title, 'ORDER FORM');
   assert.deepEqual(
@@ -73,67 +73,82 @@ test('order ticket modal requires the product, quantity, and payment method fiel
     })),
     [
       { label: 'PRODUCT', required: true },
+      { label: 'PRICE', required: true },
       { label: 'QUANTITY', required: true },
       { label: 'PAYMENT METHOD', required: true },
     ],
   );
   assert.deepEqual(
     modal.components.map((row) => row.components[0].placeholder),
-    ['DEKOR / BOBUX / SVBOWCH / PREMS / NAYTRO / GCRED1TS', '1-9999', 'GCASH / BANKTRANS / PAYMAYA'],
+    ['DEKOR / BOBUX / SVBOWCH / PREMS / NAYTRO / GCRED1TS', 'e.g. ₱ 100', '1-9999', 'GCASH / BANKTRANS / PAYMAYA'],
   );
 });
 
 test('order ticket form accepts only listed products and payment methods with quantities from 1 to 9999', () => {
   assert.deepEqual(parseOrderTicketForm({
     product: 'bobux',
+    price: ' ₱ 600 ',
     quantity: '0007',
     paymentMethod: 'gcash',
   }), {
-    value: { product: 'BOBUX', quantity: '7', paymentMethod: 'GCASH' },
+    value: { product: 'BOBUX', price: '₱ 600', quantity: '7', paymentMethod: 'GCASH' },
   });
   assert.deepEqual(parseOrderTicketForm({
     product: 'DEKOR',
+    price: '120',
     quantity: '9999',
     paymentMethod: 'PAYMAYA',
   }), {
-    value: { product: 'DEKOR', quantity: '9999', paymentMethod: 'PAYMAYA' },
+    value: { product: 'DEKOR', price: '120', quantity: '9999', paymentMethod: 'PAYMAYA' },
   });
   assert.deepEqual(parseOrderTicketForm({
     product: 'SVBOWCH',
+    price: '45',
     quantity: '3',
     paymentMethod: 'GCASH',
   }), {
-    value: { product: 'SVBOWCH', quantity: '3', paymentMethod: 'GCASH' },
+    value: { product: 'SVBOWCH', price: '45', quantity: '3', paymentMethod: 'GCASH' },
   });
   for (const product of ['NAYTRO', 'GCRED1TS']) {
     assert.deepEqual(parseOrderTicketForm({
       product: product.toLowerCase(),
+      price: '100',
       quantity: '1',
       paymentMethod: 'GCASH',
     }), {
-      value: { product, quantity: '1', paymentMethod: 'GCASH' },
+      value: { product, price: '100', quantity: '1', paymentMethod: 'GCASH' },
     });
   }
   assert.deepEqual(parseOrderTicketForm({
     product: 'OTHER',
+    price: '100',
     quantity: '3',
     paymentMethod: 'GCASH',
   }), { error: 'PRODUCT must be DEKOR, BOBUX, SVBOWCH, PREMS, NAYTRO, or GCRED1TS.' });
   assert.deepEqual(parseOrderTicketForm({
     product: 'PREMS',
+    price: '100',
     quantity: '10000',
     paymentMethod: 'GCASH',
   }), { error: 'QUANTITY must be a whole number from 1 to 9999.' });
   assert.deepEqual(parseOrderTicketForm({
     product: 'PREMS',
+    price: '100',
     quantity: '1.5',
     paymentMethod: 'GCASH',
   }), { error: 'QUANTITY must be a whole number from 1 to 9999.' });
   assert.deepEqual(parseOrderTicketForm({
     product: 'PREMS',
+    price: '100',
     quantity: '3',
     paymentMethod: 'CARD',
   }), { error: 'PAYMENT METHOD must be GCASH, BANKTRANS, or PAYMAYA.' });
+  assert.deepEqual(parseOrderTicketForm({
+    product: 'PREMS',
+    price: ' ',
+    quantity: '3',
+    paymentMethod: 'GCASH',
+  }), { error: 'PRICE cannot be blank.' });
 });
 
 test('report ticket modal requires the product, issue, and rules confirmation', () => {
@@ -187,19 +202,27 @@ test('others ticket form accepts only partnership or concern', () => {
 
 test('order ticket embed includes the submitted form answers', () => {
   const embed = ticketEmbed('order', { id: 'user-1' }, {
-    product: 'Latte',
+    product: 'BOBUX',
+    price: '₱ 600',
     quantity: '2',
-    paymentMethod: 'Card',
+    paymentMethod: 'GCASH',
   }).toJSON();
 
-  assert.deepEqual(
-    embed.fields.map((field) => [field.name, field.value]),
-    [
-      ['PRODUCT', 'Latte'],
-      ['QUANTITY', '2'],
-      ['PAYMENT METHOD', 'Card'],
-    ],
-  );
+  assert.equal(embed.title, undefined);
+  assert.equal(embed.description, [
+    '## _ _ σrd𝚎r⸺tιck𝚎t   ( <:pink_phone:1562813781996998656> )',
+    '_ _ hello! a staff member will be with',
+    '_ _ you   shortly.  please   don’t  spam',
+    '_ _ pings,   and   strictly   no   rushing.',
+    '_ _',
+    '_ _ <:sweets_candy:1561070771093119106>  —  **order  details  !**',
+    '_ _',
+    '_ _ ` product  `  :  BOBUX',
+    '_ _ `  price   `  :  ₱ 600',
+    '_ _ ` quantity `  :  2',
+    '_ _ `   mop    `  :  GCASH',
+    '_ _',
+  ].join('\n'));
 });
 
 test('report ticket embed includes all submitted report form answers', () => {
@@ -306,17 +329,27 @@ test('configured voided role is recognized for order-ticket blocking', () => {
 
 test('voided role can be granted and removed idempotently', async () => {
   const roleIds = new Set();
+  const removedRoles = [];
   const role = { id: 'voided' };
   const member = {
     roles: {
       cache: { has: (roleId) => roleIds.has(roleId) },
       add: async (addedRole) => roleIds.add(addedRole.id),
-      remove: async (removedRole) => roleIds.delete(removedRole.id),
+      remove: async (removedRole) => {
+        removedRoles.push(removedRole.id);
+        roleIds.delete(removedRole.id);
+      },
     },
   };
   const guild = {
     roles: { fetch: async () => role },
-    members: { fetch: async () => member },
+    members: {
+      fetch: async (userId, options) => {
+        assert.equal(userId, 'buyer');
+        assert.deepEqual(options, { force: true });
+        return member;
+      },
+    },
   };
 
   assert.equal(await setVoidedRole(guild, 'voided', 'buyer', true), true);
@@ -325,6 +358,28 @@ test('voided role can be granted and removed idempotently', async () => {
   assert.equal(await setVoidedRole(guild, 'voided', 'buyer', false), true);
   assert.equal(await setVoidedRole(guild, 'voided', 'buyer', false), false);
   assert.equal(roleIds.has('voided'), false);
+  assert.deepEqual(removedRoles, ['voided', 'voided']);
+});
+
+test('voided role removal calls Discord even when the member cache says the role is absent', async () => {
+  let removeCalled = false;
+  const guild = {
+    roles: { fetch: async () => ({ id: 'voided' }) },
+    members: {
+      fetch: async (_userId, options) => {
+        assert.deepEqual(options, { force: true });
+        return {
+          roles: {
+            cache: { has: () => false },
+            remove: async () => { removeCalled = true; },
+          },
+        };
+      },
+    },
+  };
+
+  assert.equal(await setVoidedRole(guild, 'voided', 'buyer', false), false);
+  assert.equal(removeCalled, true);
 });
 
 test('only configured /setadmin and /setowner roles can claim or close tickets', () => {
@@ -388,8 +443,20 @@ test('orders in tickets use the ticket owner as the customer', () => {
 test('order ticket terms container shows the terms and can be marked accepted', () => {
   const terms = orderTicketTermsContainer().toJSON();
   assert.equal(terms.type, 17);
-  assert.match(terms.components[0].content, /dolce vita's terms of service/);
-  assert.match(terms.components[0].content, /final and non-refundable/);
+  assert.equal(terms.components[0].content, [
+    '_ _',
+    '_ _ ` 🧁 `  **dσlc𝚎 vιtα’s** __t𝚎rm σf s𝚎rvιc𝚎__  ʚଓ',
+    '_ _ αll   sweeties   bought   αre   finαl   αnd',
+    '_ _ cαnnot    be    refunded.',
+    '_ _',
+    '_ _ ─ ─ ─ ─ ─ ─ ─ ─    ⪩𓋰⪨    ─ ─ ─ ─ ─ ─ ─ ─',
+    '_ _',
+    '_ _ ⚬  0-1d proc, please no rushing of orders.',
+    '_ _ ⚬  force     refunds    are    not    accepted.',
+    '_ _ ⚬  once   order   is   being   processed,  no',
+    '_ _ cancellation   or   refund   request.',
+    '_ _',
+  ].join('\n'));
   assert.equal(terms.components[1].components[0].type, 2);
   assert.equal(terms.components[1].components[0].style, 3);
   assert.equal(terms.components[1].components[0].label, 'I agree to the terms');
@@ -600,11 +667,12 @@ test('payment reminder V2 container supports servers without a custom icon', () 
 
 test('/tip send message uses the requested custom emojis and layout', () => {
   assert.equal(tipMessage('<@buyer-1>', '250'), [
-    '_ _      <:purple_rawr:1561070840894722098>     :     <@buyer-1>',
-    '',
-    '_ _         thank you for the tip !  ₱ 250  <:purplestar:1557486696193335377>',
-    '',
-    '            Grazie mille。。<a:Sweet_Heart:1561070894690992320>',
+    `_ _ ${'<:Kurtina:1566436939979296848>'.repeat(12)}`,
+    '_ _              ꮺ  <:00_treat:1562793410157613156>  **tip  tip  tip  !**    ࣪    ⊹',
+    '_ _',
+    '_ _    250   tip   from   <@buyer-1>',
+    '_ _    thank   you   for   your   sugar  tip!',
+    `_ _ ${'<:Bandage:1566436975416844298>'.repeat(12)}`,
   ].join('\n'));
 });
 
@@ -639,16 +707,25 @@ test('completed order reminder embed has no title and the warranty policy descri
 
   assert.equal(embed.title, undefined);
   assert.equal(embed.description, [
-    '**REMINDERS : WARRANTY POLICY!!**',
-    '› All completed orders come with a 12-hours warranty.',
-    '› Replacements will only be provided for verified issues covered by warranty.',
-    '› Once the warranty expires, the shop is no longer responsible for issues covered by the expired warranty.',
-    '› NO VOUCH = no refund, no replacement & no warranty.',
-    '› VOUCH IN YOUR ACTIVE ORDER TICKET.',
+    '_ _',
+    '_ _   __reminders__  :  **wαrrαnty  policy !!**  <:e_bread:1562794379796684890>',
+    '_ _',
+    '_ _ ⚬ all  completed  orders  come  with a 12',
+    '_ _ hours   warranty.',
+    '_ _ ⚬ replacements   will  only   be   provided',
+    '_ _ for  verified  issues  covered by warranty.',
+    '_ _ ⚬ once  warranty  is  expired,  the shop is',
+    '_ _ no  longer responsible for issues covered',
+    '_ _ by   the   expired   warranty.',
+    '_ _ ⚬ **NO  VOUCH**  =  no  refund  and item will',
+    '_ _ not   be   provided   with   a   replacement.',
+    '_ _ warranty   will   also   be   voided.',
+    '_ _ ⚬ type  __/vouch__  to vouch  **𝓓olce 𝓥ita** !',
+    '_ _',
   ].join('\n'));
 });
 
-test('buyer warranty DM after vouch uses the card style and keeps its warranty details', () => {
+test('buyer warranty DM after vouch uses the requested layout and keeps its details', () => {
   const container = warrantyActivatedContainer(
     { id: '1329447441128230962', username: 'alice' },
     'Bobux',
@@ -660,28 +737,37 @@ test('buyer warranty DM after vouch uses the card style and keeps its warranty d
     .join('\n');
 
   assert.equal(container.type, 17);
-  assert.match(text, /WARRANTY ACTIVATED/i);
-  assert.match(text, /<a:vitacheck:1557378165457027072>/);
-  assert.match(text, /applies only to \(nitro, premium subs, svboosts\)/i);
-  assert.match(text, /you may ignore this if you purchased discord items/i);
-  assert.match(text, /present this if your item gets \*\*revoked\*\*/i);
-  assert.match(text, /Deleting this message will automatically void the warranty/);
-  assert.match(text, /<@1329447441128230962>/);
-  assert.match(text, /🍩 \*\*order details\*\*/);
-  assert.match(text, /> Bobux/);
-  assert.match(text, /October 05, 2026 at 6:53 AM PHT \(UTC\+8\)/);
-  assert.match(text, /proof:/i);
+  assert.equal(text, [
+    '### _ _             warranty  activated   <:0cpink_bow:1562803659190829126>',
+    '_ _',
+    '_ _ ⚬  applied  only  to  ntro, prems, and svb.',
+    '_ _ ⚬  you  may  ignore  this if you purchased',
+    '_ _ dc   items.',
+    '_ _ ⚬  present this if your item gets revoked.',
+    '_ _',
+    '-# _ _ deleting   this   message   will   automatically',
+    '-# _ _ void    the    warranty.',
+    '_ _',
+    '_ _ ─ ─ ─ ─ ─ ─ ─ ─ ─    ⪩𓋰⪨    ─ ─ ─ ─ ─ ─ ─ ─ ─',
+    '_ _',
+    '_ _  __order details__  <:00_treat:1562793410157613156>',
+    '_ _',
+    '_ _ ꒰ buyer ꒱  :  <@1329447441128230962>',
+    '_ _ ꒰ item ꒱  :  Bobux',
+    '_ _ ꒰ date vouched ꒱  :  October 05, 2026 at 6:53 AM PHT (UTC+8)',
+    '_ _ ꒰ proof ꒱  :',
+  ].join('\n'));
   assert.ok(container.components.some((component) => (
     component.type === 12
     && component.items[0].media.url === 'attachment://vouch-proofs.png'
   )));
 });
 
-test('completion DM puts the vouch shortcut button inside the reminder container', () => {
+test('completion DM includes the new reminder and vouch shortcut button', () => {
   const container = vouchReminderContainer('guild-123', 'ticket-456').toJSON();
   const button = container.components[1].components[0];
   assert.equal(container.type, 17);
-  assert.match(container.components[0].content, /CLICK “Vouch now” TO VOUCH DOLCE VITA/);
+  assert.match(container.components[0].content, /type  __\/vouch__  to vouch  \*\*𝓓olce 𝓥ita\*\* !/);
   assert.equal(button.label, 'Vouch now');
   assert.equal(button.style, 1);
   assert.equal(button.custom_id, 'vouch:shortcut:guild-123:ticket-456');

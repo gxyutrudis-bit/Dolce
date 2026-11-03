@@ -6,7 +6,7 @@ const test = require('node:test');
 const { OrderStore, ORDER_ACTIVE_DURATION_MS, VOUCH_WINDOW_MS } = require('../src/store');
 const {
   orderButtons,
-  orderContainer,
+  orderMessagePayload,
   orderStatusEmbed,
   queueEmbed,
   queueConfirmationMessage,
@@ -161,7 +161,7 @@ test('latest order lookup is scoped to its guild, source channel, and optional t
   assert.equal(store.getLatestOrderForSource('guild-1', 'ticket-2'), null);
 });
 
-test('queue confirmation uses the new layout and includes ticket, owner, order, status, and supporter', () => {
+test('queue confirmation uses the requested shared order layout', () => {
   const message = queueConfirmationMessage({
     ticketProduct: 'DEKOR',
     sourceChannelId: 'ticket-1',
@@ -179,12 +179,11 @@ test('queue confirmation uses the new layout and includes ticket, owner, order, 
     '_ _',
     '_ _       ──────────  <:0cpink_bow:1562803659190829126>  ──────────',
     '_ _              ꒰  <:00_treat:1562793410157613156>  ꒱   **order**  __queue__   !!',
-    '_ _                 ⚬  @alice',
     '_ _                 ⚬  <#ticket-1>  :  <@buyer-1>',
     '_ _                 ⚬  DEKOR．2',
     '_ _                 ⚬  paid via __GCash__',
     '_ _                 ⚬  status   :   __Noted__',
-    '_ _         served by <@staff-1> <a:sweet_nom:1561070811773935797>',
+    '_ _                  served by <@staff-1> <a:sweet_nom:1561070811773935797>',
     '_ _       ──────────  <a:pinkletter:1562804355856597092>  ──────────',
     '_ _',
   ].join('\n'));
@@ -236,7 +235,7 @@ test('ticket product is displayed as the order reference while buttons retain th
   assert.match(queueEmbed([order]).toJSON().fields[0].name, /#GAMECREDITS/);
 });
 
-test('completed and cancelled statuses override processing in the order container', () => {
+test('completed and cancelled statuses override processing in the order message', () => {
   const order = {
     id: 'ORDER-1',
     status: 'completed',
@@ -250,10 +249,10 @@ test('completed and cancelled statuses override processing in the order containe
     createdAt: new Date().toISOString(),
   };
 
-  const completedContainer = orderContainer(order).toJSON();
-  assert.match(completedContainer.components[0].content, /status   :   __Complete__/);
-  const cancelledContainer = orderContainer({ ...order, status: 'cancelled' }).toJSON();
-  assert.match(cancelledContainer.components[0].content, /status   :   __Cancelled__/);
+  const completedMessage = orderMessagePayload(order);
+  assert.match(completedMessage.content, /status   :   __Complete__/);
+  const cancelledMessage = orderMessagePayload({ ...order, status: 'cancelled' });
+  assert.match(cancelledMessage.content, /status   :   __Cancelled__/);
 });
 
 test('source-channel status labels reflect processing, complete, and cancelled transitions', () => {
@@ -288,8 +287,8 @@ test('order status notification embed includes the order status and details', ()
   );
 });
 
-test('new order container uses the requested order-list layout and displays the ticket owner, quantity, and supporter', () => {
-  const container = orderContainer({
+test('new order message uses the requested layout and standard components', () => {
+  const message = orderMessagePayload({
     id: 'ORDER-2',
     ticketProduct: 'DEKOR',
     status: 'pending',
@@ -302,26 +301,29 @@ test('new order container uses the requested order-list layout and displays the 
     supporterId: 'staff-1',
     sourceChannelId: 'source-1',
     createdAt: new Date().toISOString(),
-  }).toJSON();
+  });
 
-  assert.equal(container.type, 17);
-  assert.equal(container.accent_color, undefined);
-  assert.deepEqual(container.components.map(({ type }) => type), [10, 1]);
-  assert.equal(container.components[0].content, [
+  assert.equal(message.content, [
     '_ _',
     '_ _       ──────────  <:0cpink_bow:1562803659190829126>  ──────────',
     '_ _              ꒰  <:00_treat:1562793410157613156>  ꒱   **order**  __queue__   !!',
-    '_ _                 ⚬  @alex',
-    '_ _                 ⚬  <#source-1> : <@customer-1>',
+    '_ _                 ⚬  <#source-1>  :  <@customer-1>',
     '_ _                 ⚬  Coffee．1',
     '_ _                 ⚬  paid via __Cash__',
     '_ _                 ⚬  status   :   __Noted__',
-    '_ _         served by <@staff-1> <a:sweet_nom:1561070811773935797>',
+    '_ _                  served by <@staff-1> <a:sweet_nom:1561070811773935797>',
     '_ _       ──────────  <a:pinkletter:1562804355856597092>  ──────────',
     '_ _',
   ].join('\n'));
+  assert.equal(message.components.length, 1);
+  assert.deepEqual(message.components[0].toJSON().components.map(({ label }) => label), [
+    'processing',
+    'complete',
+    'cancelled',
+  ]);
+  assert.deepEqual(message.allowedMentions, { parse: [] });
 
-  const missingSupporter = orderContainer({
+  const missingSupporter = orderMessagePayload({
     id: 'ORDER-3',
     status: 'pending',
     processingStatus: 'not_yet',
@@ -329,14 +331,14 @@ test('new order container uses the requested order-list layout and displays the 
     quantity: 2,
     paymentMethod: 'GCASH',
     sourceChannelId: 'source-2',
-  }).toJSON();
-  assert.match(missingSupporter.components[0].content, /<#source-2> : Unknown buyer/);
-  assert.match(missingSupporter.components[0].content, /Tea．2/);
-  assert.match(missingSupporter.components[0].content, /served by Not assigned/);
+  });
+  assert.match(missingSupporter.content, /<#source-2>  :  Unknown buyer/);
+  assert.match(missingSupporter.content, /Tea．2/);
+  assert.match(missingSupporter.content, /served by Not assigned/);
 });
 
-test('order container includes item quantity and status styling', () => {
-  const container = orderContainer({
+test('order message includes item quantity and status styling', () => {
+  const message = orderMessagePayload({
     id: 'ORDER-9',
     status: 'pending',
     processingStatus: 'processing',
@@ -346,12 +348,12 @@ test('order container includes item quantity and status styling', () => {
     paymentMethod: 'Cash',
     supporterId: 'staff-1',
     sourceChannelId: 'source-1',
-  }).toJSON();
+  });
 
-  assert.match(container.components[0].content, /<#source-1> : <@customer-1>/);
-  assert.match(container.components[0].content, /Coffee．7/);
-  assert.match(container.components[0].content, /status   :   __Processing__/);
-  assert.match(container.components[0].content, /served by <@staff-1>/);
+  assert.match(message.content, /<#source-1>  :  <@customer-1>/);
+  assert.match(message.content, /Coffee．7/);
+  assert.match(message.content, /status   :   __Processing__/);
+  assert.match(message.content, /served by <@staff-1>/);
 });
 
 test('vouch embed omits warranty text and shows the date in Philippine time', () => {

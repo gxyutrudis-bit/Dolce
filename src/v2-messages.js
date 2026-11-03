@@ -6,6 +6,14 @@ const {
   TextDisplayBuilder,
 } = require('discord.js');
 
+const STANDARD_PAYLOAD = Symbol('standardPayload');
+
+function standardPayload(payload) {
+  const normalized = typeof payload === 'string' ? { content: payload } : { ...payload };
+  Object.defineProperty(normalized, STANDARD_PAYLOAD, { value: true });
+  return normalized;
+}
+
 function splitText(text, maxLength = 4000) {
   const chunks = [];
   let remaining = text;
@@ -50,7 +58,16 @@ function embedContainer(embed) {
 }
 
 function v2Payload(payload) {
+  const isStandardPayload = Boolean(payload && typeof payload === 'object' && payload[STANDARD_PAYLOAD]);
   const normalized = typeof payload === 'string' ? { content: payload } : { ...payload };
+  if (isStandardPayload) {
+    if (normalized.ephemeral) {
+      normalized.flags = Number(normalized.flags ?? 0) | MessageFlags.Ephemeral;
+      delete normalized.ephemeral;
+    }
+    return normalized;
+  }
+
   const components = [];
   if (normalized.content) {
     for (const chunk of splitText(normalized.content)) {
@@ -102,6 +119,7 @@ async function sendV2(target, payload) {
 
 module.exports = {
   sendV2,
+  standardPayload,
   v2Payload,
   wrapInteractionResponses,
   wrapMessageResponses,

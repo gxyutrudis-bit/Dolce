@@ -10,7 +10,12 @@ const {
 } = require('../src/embeds');
 const commands = require('../src/commands');
 const {
+  orderMessagePayload,
+} = require('../src/embeds');
+const {
+  sendV2,
   v2Payload,
+  standardPayload,
   wrapInteractionResponses,
   wrapMessageResponses,
 } = require('../src/v2-messages');
@@ -65,6 +70,53 @@ test('interaction replies and message replies are wrapped as V2 payloads', async
   wrapMessageResponses(message);
   const messageReply = await message.reply('Message response');
   assert.equal(messageReply.flags & MessageFlags.IsComponentsV2, MessageFlags.IsComponentsV2);
+});
+
+test('/order payload bypasses V2 conversion and retains standard message components', async () => {
+  const orderPayload = standardPayload(orderMessagePayload({
+    id: 'order-1',
+    status: 'pending',
+    processingStatus: 'not_yet',
+    items: 'Coffee',
+    quantity: 2,
+    paymentMethod: 'Cash',
+    customerId: 'buyer-1',
+    supporterId: 'staff-1',
+    sourceChannelId: 'ticket-1',
+  }));
+  const wrappedInteraction = {
+    update: async (payload) => payload,
+  };
+  wrapInteractionResponses(wrappedInteraction);
+
+  const payload = await wrappedInteraction.update(orderPayload);
+  assert.match(payload.content, /<#ticket-1>  :  <@buyer-1>/);
+  assert.match(payload.content, /Coffee．2/);
+  assert.match(payload.content, /paid via __Cash__/);
+  assert.match(payload.content, /status   :   __Noted__/);
+  assert.equal(payload.flags, undefined);
+  assert.equal(payload.components.length, 1);
+  assert.equal(payload.components[0].toJSON().type, 1);
+  assert.deepEqual(v2Payload(orderPayload), payload);
+});
+
+test('completion reminder sent to the order ticket bypasses V2 container conversion', async () => {
+  const reminder = new EmbedBuilder().setDescription('Warranty reminder');
+  let sentPayload;
+  await sendV2({
+    send: async (payload) => {
+      sentPayload = payload;
+      return payload;
+    },
+  }, standardPayload({
+    embeds: [reminder],
+    allowedMentions: { parse: [] },
+  }));
+
+  assert.deepEqual(sentPayload.embeds, [reminder]);
+  assert.equal(sentPayload.components, undefined);
+  assert.equal(sentPayload.flags, undefined);
+  assert.deepEqual(sentPayload.allowedMentions, { parse: [] });
 });
 
 test('DM vouch shortcut button is bound to its ticket instead of the public channel URL', () => {
