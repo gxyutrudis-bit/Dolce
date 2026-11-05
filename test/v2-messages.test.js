@@ -11,6 +11,7 @@ const {
 const commands = require('../src/commands');
 const {
   orderMessagePayload,
+  tipMessage,
 } = require('../src/embeds');
 const {
   sendV2,
@@ -117,6 +118,25 @@ test('completion reminder sent to the order ticket bypasses V2 container convers
   assert.equal(sentPayload.components, undefined);
   assert.equal(sentPayload.flags, undefined);
   assert.deepEqual(sentPayload.allowedMentions, { parse: [] });
+});
+
+test('/tip send bypasses V2 container conversion and keeps its buyer mention', async () => {
+  let sentPayload;
+  await sendV2({
+    send: async (payload) => {
+      sentPayload = payload;
+      return payload;
+    },
+  }, standardPayload({
+    content: tipMessage('<@buyer-1>', '250'),
+    allowedMentions: { parse: [], users: ['buyer-1'] },
+  }));
+
+  assert.match(sentPayload.content, /250   tip   from   <@buyer-1>/);
+  assert.equal(sentPayload.embeds, undefined);
+  assert.equal(sentPayload.components, undefined);
+  assert.equal(sentPayload.flags, undefined);
+  assert.deepEqual(sentPayload.allowedMentions, { parse: [], users: ['buyer-1'] });
 });
 
 test('DM vouch shortcut button is bound to its ticket instead of the public channel URL', () => {

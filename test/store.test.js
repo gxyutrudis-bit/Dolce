@@ -7,7 +7,7 @@ const { OrderStore, ORDER_ACTIVE_DURATION_MS, VOUCH_WINDOW_MS } = require('../sr
 const {
   orderButtons,
   orderMessagePayload,
-  orderStatusEmbed,
+  orderStatusText,
   queueEmbed,
   queueConfirmationMessage,
 } = require('../src/embeds');
@@ -262,8 +262,8 @@ test('source-channel status labels reflect processing, complete, and cancelled t
   assert.equal(orderStatusLabel({ status: 'expired', processingStatus: 'not_yet' }), 'Expired');
 });
 
-test('order status notification embed includes the order status and details', () => {
-  const embed = orderStatusEmbed({
+test('order status notification uses the requested plain-text layout', () => {
+  const text = orderStatusText({
     id: 'ORDER-3',
     ticketProduct: 'DEKOR',
     status: 'completed',
@@ -272,19 +272,19 @@ test('order status notification embed includes the order status and details', ()
     quantity: 2,
     paymentMethod: 'Card',
     sourceChannelId: 'source-1',
-  }).toJSON();
+  });
 
-  assert.equal(embed.title, 'Order Status Update');
-  assert.match(embed.description, /#DEKOR.*Complete/);
-  assert.deepEqual(
-    embed.fields.map(({ name, value }) => [name, value]),
-    [
-      ['Items', 'Coffee'],
-      ['Quantity', '2'],
-      ['Payment method', 'Card'],
-      ['Submitted in', '<#source-1>'],
-    ],
-  );
+  assert.equal(text, [
+    '_ _',
+    '### _ _    ＠<:e_cupcake:1562794346477256788>  σrder status update  ʚଓ𓏼',
+    '_ _ your   order   is   now   __complete__.   (⁠ ⁠ꈍ⁠ᴗ⁠ꈍ⁠)',
+    '_ _',
+    '_ _ <:purpleflower:1557500052107304981>  :  item  —  Coffee',
+    '_ _ <:purpleflower:1557500052107304981>  :  quantity  —  2',
+    '_ _ <:purpleflower:1557500052107304981>  :  mop  —  Card',
+    '_ _ <:purpleflower:1557500052107304981>  :  submitted in  —  <#source-1>',
+    '_ _',
+  ].join('\n'));
 });
 
 test('new order message uses the requested layout and standard components', () => {

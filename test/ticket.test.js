@@ -3,6 +3,7 @@ const test = require('node:test');
 const {
   orderTicketModal,
   ticketPanelButtons,
+  ticketOrderText,
   ticketEmbed,
   ticketButtons,
   reportTicketModal,
@@ -33,6 +34,7 @@ const { ticketChannelName } = require('../src/ticket-names');
 const {
   ticketOwnerId,
   isOrderTicket,
+  ticketType,
   ticketChannelTopic,
   ticketTermsRequired,
   ticketTermsAccepted,
@@ -200,16 +202,15 @@ test('others ticket form accepts only partnership or concern', () => {
   });
 });
 
-test('order ticket embed includes the submitted form answers', () => {
-  const embed = ticketEmbed('order', { id: 'user-1' }, {
+test('order ticket message text includes the submitted form answers', () => {
+  const text = ticketOrderText({
     product: 'BOBUX',
     price: '₱ 600',
     quantity: '2',
     paymentMethod: 'GCASH',
-  }).toJSON();
+  });
 
-  assert.equal(embed.title, undefined);
-  assert.equal(embed.description, [
+  assert.equal(text, [
     '## _ _ σrd𝚎r⸺tιck𝚎t   ( <:pink_phone:1562813781996998656> )',
     '_ _ hello! a staff member will be with',
     '_ _ you   shortly.  please   don’t  spam',
@@ -422,6 +423,8 @@ test('ticket owner lookup only recognizes active ticket topics', () => {
   assert.equal(ticketOwnerId({ topic: 'ticket-owner:123456789012345678' }), null);
   assert.equal(ticketOwnerId({ topic: 'ticket-owner:123456789012345678;ticket-type:unknown' }), null);
   assert.equal(ticketOwnerId(null), null);
+  assert.equal(ticketType({ topic: 'ticket-owner:123456789012345678;ticket-type:others' }), 'others');
+  assert.equal(ticketType({ topic: 'ticket-owner:123456789012345678;ticket-type:unknown' }), null);
   assert.equal(isOrderTicket({ topic: 'ticket-owner:123456789012345678;ticket-type:order' }), true);
   assert.equal(isOrderTicket({ topic: 'ticket-owner:123456789012345678;ticket-type:report' }), false);
   assert.equal(isOrderTicket({ topic: 'ticket-type:order' }), false);
@@ -868,12 +871,27 @@ test('ticketsetup shortcut is registered as an administrator command', () => {
   assert.equal(shortcut.default_member_permissions, '8');
 });
 
+test('/join is registered without options', () => {
+  const command = commands.find((entry) => entry.name === 'join');
+  assert.ok(command);
+  assert.deepEqual(command.options, []);
+});
+
 test('/set voided is registered with a required text channel', () => {
   const setCommand = commands.find((entry) => entry.name === 'set');
   const voidedSubcommand = setCommand.options.find((option) => option.name === 'voided');
   assert.ok(voidedSubcommand);
   assert.equal(voidedSubcommand.options[0].name, 'channel');
   assert.equal(voidedSubcommand.options[0].required, true);
+  assert.equal(setCommand.default_member_permissions, '8');
+});
+
+test('/set psm is registered for administrators with a required role', () => {
+  const setCommand = commands.find((entry) => entry.name === 'set');
+  const psmCommand = setCommand.options.find((option) => option.name === 'psm');
+  assert.ok(psmCommand);
+  assert.equal(psmCommand.options[0].name, 'role');
+  assert.equal(psmCommand.options[0].required, true);
   assert.equal(setCommand.default_member_permissions, '8');
 });
 

@@ -1,10 +1,11 @@
 const { PermissionFlagsBits } = require('discord.js');
 
-function ticketAccessRoleIds(settings) {
+function ticketAccessRoleIds(settings, type) {
   return [...new Set([
     settings?.ticketStaffRoleId,
     settings?.adminRoleId,
     settings?.ownerRoleId,
+    ...(type === 'others' ? [settings?.psmRoleId] : []),
   ].filter(Boolean))];
 }
 
@@ -46,7 +47,7 @@ function ticketOwnerPermissionOverwrite(userId, type) {
   return overwrite;
 }
 
-function ticketAccessRolePermissionOverwrite(roleId, type) {
+function ticketAccessRolePermissionOverwrite(roleId, type, settings) {
   const overwrite = {
     id: roleId,
     allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
@@ -55,6 +56,10 @@ function ticketAccessRolePermissionOverwrite(roleId, type) {
     overwrite.deny = [PermissionFlagsBits.SendMessages, PermissionFlagsBits.SendMessagesInThreads];
   } else {
     overwrite.allow.push(PermissionFlagsBits.SendMessages);
+  }
+  if (type === 'others' && settings?.psmRoleId && roleId !== settings.psmRoleId) {
+    overwrite.allow = overwrite.allow.filter((permission) => permission !== PermissionFlagsBits.ViewChannel);
+    overwrite.deny = [PermissionFlagsBits.ViewChannel];
   }
   return overwrite;
 }

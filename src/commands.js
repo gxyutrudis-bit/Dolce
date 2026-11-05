@@ -5,6 +5,9 @@ module.exports = [
     .setName('help')
     .setDescription('List all bot commands.'),
   new SlashCommandBuilder()
+    .setName('join')
+    .setDescription('Join your current voice channel and stay there.'),
+  new SlashCommandBuilder()
     .setName('setup')
     .setDescription('Choose the channel for public order posts.')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
@@ -58,6 +61,13 @@ module.exports = [
       .addRoleOption((option) => option
         .setName('role')
         .setDescription('Role assigned on completion and removed after a vouch within 12 hours')
+        .setRequired(true)))
+    .addSubcommand((subcommand) => subcommand
+      .setName('psm')
+      .setDescription('Choose who can view partnership and concern tickets.')
+      .addRoleOption((option) => option
+        .setName('role')
+        .setDescription('Role allowed to view partnership and concern tickets')
         .setRequired(true))),
   new SlashCommandBuilder()
     .setName('tip')

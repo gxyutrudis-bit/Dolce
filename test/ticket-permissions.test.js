@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const {
+  ticketAccessRoleIds,
   hasTicketManagerRole,
   ticketOwnerPermissionOverwrite,
   ticketAccessRolePermissionOverwrite,
@@ -28,4 +29,22 @@ test('order ticket owners and staff cannot send messages until terms are accepte
 
   assert.ok(ticketOwnerPermissionOverwrite('owner', 'report').allow.includes(PermissionFlagsBits.SendMessages));
   assert.ok(ticketAccessRolePermissionOverwrite('staff', 'report').allow.includes(PermissionFlagsBits.SendMessages));
+});
+
+test('only the configured PSM role gets access to others tickets', () => {
+  const settings = {
+    ticketStaffRoleId: 'ticket-staff',
+    adminRoleId: 'admin',
+    ownerRoleId: 'owner',
+    psmRoleId: 'psm',
+  };
+  assert.deepEqual(ticketAccessRoleIds(settings, 'others'), ['ticket-staff', 'admin', 'owner', 'psm']);
+  assert.deepEqual(ticketAccessRolePermissionOverwrite('ticket-staff', 'others', settings), {
+    id: 'ticket-staff',
+    allow: [PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.SendMessages],
+    deny: [PermissionFlagsBits.ViewChannel],
+  });
+  assert.ok(ticketAccessRolePermissionOverwrite('psm', 'others', settings).allow.includes(PermissionFlagsBits.ViewChannel));
+  assert.ok(ticketAccessRolePermissionOverwrite('admin', 'report', settings).allow.includes(PermissionFlagsBits.ViewChannel));
+  assert.deepEqual(ticketAccessRoleIds(settings, 'report'), ['ticket-staff', 'admin', 'owner']);
 });

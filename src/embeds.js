@@ -137,20 +137,20 @@ function vouchFormModal(guildId, ticketChannelId) {
     );
 }
 
-function orderStatusEmbed(order) {
-  const status = orderStatusLabel(order);
-  const colors = { Processing: 0x3478c7, Complete: 0x35a16b, Cancelled: 0xc94c4c };
-  return new EmbedBuilder()
-    .setColor(colors[status])
-    .setTitle('Order Status Update')
-    .setDescription(`Your order **#${orderReference(order)}** is now **${status}**.`)
-    .addFields(
-      { name: 'Items', value: String(order.items ?? order.item), inline: true },
-      { name: 'Quantity', value: String(order.quantity), inline: true },
-      { name: 'Payment method', value: order.paymentMethod ?? 'Not specified', inline: true },
-      { name: 'Submitted in', value: order.sourceChannelId ? `<#${order.sourceChannelId}>` : 'Unknown channel' },
-    )
-    .setTimestamp();
+function orderStatusText(order) {
+  const status = orderStatusLabel(order).toLowerCase();
+  const ticket = order.sourceChannelId ? `<#${order.sourceChannelId}>` : 'Unknown ticket';
+  return [
+    '_ _',
+    '### _ _    ＠<:e_cupcake:1562794346477256788>  σrder status update  ʚଓ𓏼',
+    `_ _ your   order   is   now   __${status}__.   (⁠ ⁠ꈍ⁠ᴗ⁠ꈍ⁠)`,
+    '_ _',
+    `_ _ <:purpleflower:1557500052107304981>  :  item  —  ${order.items ?? order.item ?? 'Unknown item'}`,
+    `_ _ <:purpleflower:1557500052107304981>  :  quantity  —  ${order.quantity ?? 1}`,
+    `_ _ <:purpleflower:1557500052107304981>  :  mop  —  ${order.paymentMethod ?? 'Not specified'}`,
+    `_ _ <:purpleflower:1557500052107304981>  :  submitted in  —  ${ticket}`,
+    '_ _',
+  ].join('\n');
 }
 
 function voidedOrderMessage(user, product) {
@@ -664,26 +664,24 @@ function othersTicketModal() {
     );
 }
 
-function ticketEmbed(type, user, orderForm, reportForm, othersForm) {
-  if (orderForm) {
-    return new EmbedBuilder()
-      .setColor(0x3478c7)
-      .setDescription([
-        '## _ _ σrd𝚎r⸺tιck𝚎t   ( <:pink_phone:1562813781996998656> )',
-        '_ _ hello! a staff member will be with',
-        '_ _ you   shortly.  please   don’t  spam',
-        '_ _ pings,   and   strictly   no   rushing.',
-        '_ _',
-        '_ _ <:sweets_candy:1561070771093119106>  —  **order  details  !**',
-        '_ _',
-        `_ _ \` product  \`  :  ${orderForm.product}`,
-        `_ _ \`  price   \`  :  ${orderForm.price}`,
-        `_ _ \` quantity \`  :  ${orderForm.quantity}`,
-        `_ _ \`   mop    \`  :  ${orderForm.paymentMethod}`,
-        '_ _',
-      ].join('\n'));
-  }
+function ticketOrderText(orderForm) {
+  return [
+    '## _ _ σrd𝚎r⸺tιck𝚎t   ( <:pink_phone:1562813781996998656> )',
+    '_ _ hello! a staff member will be with',
+    '_ _ you   shortly.  please   don’t  spam',
+    '_ _ pings,   and   strictly   no   rushing.',
+    '_ _',
+    '_ _ <:sweets_candy:1561070771093119106>  —  **order  details  !**',
+    '_ _',
+    `_ _ \` product  \`  :  ${orderForm.product}`,
+    `_ _ \`  price   \`  :  ${orderForm.price}`,
+    `_ _ \` quantity \`  :  ${orderForm.quantity}`,
+    `_ _ \`   mop    \`  :  ${orderForm.paymentMethod}`,
+    '_ _',
+  ].join('\n');
+}
 
+function ticketEmbed(type, user, orderForm, reportForm, othersForm) {
   const embed = new EmbedBuilder()
     .setColor(0x3478c7)
     .setTitle(`${type.toUpperCase()} TICKET`)
@@ -829,7 +827,7 @@ module.exports = {
   orderButtons,
   orderContainer,
   orderMessagePayload,
-  orderStatusEmbed,
+  orderStatusText,
   voidedOrderMessage,
   tipMessage,
   orderCompletionReminderEmbed,
@@ -863,6 +861,7 @@ module.exports = {
   ticketCloseConfirmationEmbed,
   ticketCloseConfirmationButtons,
   ticketCloseReasonModal,
+  ticketOrderText,
   ticketEmbed,
   ticketPanelButtons,
   ticketTranscriptEmbed,

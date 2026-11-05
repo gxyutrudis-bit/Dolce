@@ -8,6 +8,12 @@ const {
   PermissionFlagsBits,
   MessageFlags,
 } = require('discord.js');
+const {
+  entersState,
+  getVoiceConnection,
+  joinVoiceChannel,
+  VoiceConnectionStatus,
+} = require('@discordjs/voice');
 const { randomUUID } = require('node:crypto');
 const path = require('node:path');
 const { OrderStore, ORDER_ACTIVE_DURATION_MS, VOUCH_WINDOW_MS } = require('./store');
@@ -15,7 +21,7 @@ const {
   orderButtons,
   orderContainer,
   orderMessagePayload,
-  orderStatusEmbed,
+  orderStatusText,
   orderCompletionReminderEmbed,
   multiplicationContainer,
   paymentReminderContainer,
@@ -44,6 +50,7 @@ const {
   robuxAvailabilityMessage,
   reportTicketModal,
   ticketButtons,
+  ticketOrderText,
   ticketCloseConfirmationEmbed,
   ticketCloseConfirmationButtons,
   ticketCloseReasonModal,
@@ -57,6 +64,7 @@ const { ticketChannelName } = require('./ticket-names');
 const {
   ticketOwnerId,
   isOrderTicket,
+  ticketType,
   ticketChannelTopic,
   ticketTermsRequired,
   ticketTermsAccepted,
@@ -105,6 +113,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildVoiceStates,
   ],
 });
 const stickyRefreshes = new Map();
@@ -119,6 +128,49 @@ const pendingVouchPreviews = new Map();
 const VOUCH_PREVIEW_DURATION_MS = 15 * 60 * 1000;
 const pendingDmsOrderForms = new Map();
 const DMS_ORDER_FORM_DURATION_MS = 15 * 60 * 1000;
+
+async function connectToVoiceChannel(guild, channel) {
+  const existing = getVoiceConnection(guild.id);
+  if (existing?.joinConfig.channelId === channel.id && existing.state.status !== VoiceConnectionStatus.Destroyed) {
+    await entersState(existing, VoiceConnectionStatus.Ready, 20_000);
+    return existing;
+  }
+  existing?.destroy();
+
+  const connection = joinVoiceChannel({
+    channelId: channel.id,
+    guildId: guild.id,
+    adapterCreator: guild.voiceAdapterCreator,
+    selfDeaf: true,
+  });
+  connection.on('error', (error) => console.error(`Voice connection error in guild ${guild.id}:`, error));
+  try {
+    await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
+    return connection;
+  } catch (error) {
+    connection.destroy();
+    throw error;
+  }
+}
+
+async function restoreConfiguredVoiceChannels() {
+  const guildSettings = store.read().settings ?? {};
+  for (const [guildId, settings] of Object.entries(guildSettings)) {
+    if (!settings.voiceChannelId) continue;
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) continue;
+    try {
+      const channel = await guild.channels.fetch(settings.voiceChannelId);
+      if (channel?.type !== ChannelType.GuildVoice) {
+        throw new Error('Configured channel is not a voice channel.');
+      }
+      await connectToVoiceChannel(guild, channel);
+      console.log(`Rejoined voice channel ${channel.name} in guild ${guildId}`);
+    } catch (error) {
+      console.error(`Could not restore voice connection in guild ${guildId}:`, error);
+    }
+  }
+}
 
 function discardVouchPreview(previewId) {
   const preview = pendingVouchPreviews.get(previewId);
@@ -1030,7 +1082,7 @@ async function createTicketChannel(interaction, type, orderForm, reportForm, oth
     if (existingTicket) return { channel: existingTicket, created: false };
 
     const settings = store.getSettings(interaction.guildId);
-    const ticketRoleIds = ticketAccessRoleIds(settings);
+    const ticketRoleIds = ticketAccessRoleIds(settings, type);
     for (const roleId of ticketRoleIds) {
       if (!guild.roles.cache.has(roleId)) {
         throw new Error(`Configured ticket role ${roleId} no longer exists.`);
@@ -1054,7 +1106,7 @@ async function createTicketChannel(interaction, type, orderForm, reportForm, oth
       },
     ];
     for (const roleId of ticketRoleIds) {
-      permissionOverwrites.push(ticketAccessRolePermissionOverwrite(roleId, type));
+      permissionOverwrites.push(ticketAccessRolePermissionOverwrite(roleId, type, settings));
     }
     let parent;
     const categorySettingKey = {
@@ -1087,7 +1139,9 @@ async function createTicketChannel(interaction, type, orderForm, reportForm, oth
     );
     const ticketMessagePayload = {
       ...ticketManagerMentionPayload(settings),
-      embeds: [ticketEmbed(type, interaction.user, orderForm, reportForm, othersForm)],
+      ...(type === 'order'
+        ? { content: ticketOrderText(orderForm) }
+        : { embeds: [ticketEmbed(type, interaction.user, orderForm, reportForm, othersForm)] }),
       components: [ticketButtons()],
     };
     await sendV2(channel, type === 'order'
@@ -1104,12 +1158,48 @@ async function createTicketChannel(interaction, type, orderForm, reportForm, oth
   });
 }
 
+async function updateOthersTicketRoleAccess(guild, previousSettings, settings) {
+  const roleIds = new Set([
+    ...ticketAccessRoleIds(previousSettings, 'others'),
+    ...ticketAccessRoleIds(settings, 'others'),
+  ]);
+  const channels = await guild.channels.fetch();
+  for (const channel of channels.values()) {
+    if (!channel.topic?.match(/(?:^|;)ticket-type:others(?:;|$)/) || channel.name.startsWith('closed-')) continue;
+    for (const roleId of roleIds) {
+      await channel.permissionOverwrites.edit(roleId, {
+        ViewChannel: roleId === settings.psmRoleId,
+      });
+    }
+  }
+}
+
 async function handleCommand(interaction) {
   if (interaction.commandName === 'help') {
     return interaction.reply({
       embeds: [helpEmbed(commands)],
       allowedMentions: { parse: [] },
     });
+  }
+
+  if (interaction.commandName === 'join') {
+    if (!interaction.inGuild()) {
+      return interaction.reply({ content: 'Use `/join` in a server while connected to a voice channel.', ephemeral: true });
+    }
+    await interaction.deferReply({ ephemeral: true });
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+    const channel = member.voice.channel;
+    if (!channel || channel.type !== ChannelType.GuildVoice) {
+      return interaction.editReply('Join a regular voice channel first, then run `/join`.');
+    }
+    const botMember = await interaction.guild.members.fetchMe();
+    const permissions = channel.permissionsFor(botMember);
+    if (!permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect])) {
+      return interaction.editReply('I need the View Channel and Connect permissions in that voice channel.');
+    }
+    await connectToVoiceChannel(interaction.guild, channel);
+    store.setSettings(interaction.guildId, { voiceChannelId: channel.id });
+    return interaction.editReply(`Joined **${channel.name}**. I’ll reconnect here after a restart.`);
   }
 
   if (interaction.commandName === 'ticketsetup') {
@@ -1204,6 +1294,26 @@ async function handleCommand(interaction) {
     return interaction.reply({ content: `Customers with voided orders can vouch in ${channel}.`, ephemeral: true });
   }
 
+  if (interaction.commandName === 'set' && interaction.options.getSubcommand() === 'psm') {
+    const role = interaction.options.getRole('role', true);
+    const previousSettings = store.getSettings(interaction.guildId) ?? {};
+    const settings = { ...previousSettings, psmRoleId: role.id };
+    store.setSettings(interaction.guildId, { psmRoleId: role.id });
+    try {
+      await updateOthersTicketRoleAccess(interaction.guild, previousSettings, settings);
+    } catch (error) {
+      console.error('Could not update partnership and concern ticket visibility:', error);
+      return interaction.reply({
+        content: `The PSM role is set to **${role.name}**, but I could not update every existing partnership/concern ticket. Check that I can manage channel permissions.`,
+        ephemeral: true,
+      });
+    }
+    return interaction.reply({
+      content: `**${role.name}** can now view partnership and concern tickets. Existing open tickets were updated.`,
+      ephemeral: true,
+    });
+  }
+
   if (interaction.commandName === 'tip' && interaction.options.getSubcommand() === 'channel') {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
       return interaction.reply({ content: 'Only a server administrator can set the tip channel.', ephemeral: true });
@@ -1243,10 +1353,10 @@ async function handleCommand(interaction) {
 
     const amount = new Intl.NumberFormat('en-PH', { maximumFractionDigits: 2 })
       .format(interaction.options.getNumber('amount', true));
-    await sendV2(channel, {
+    await sendV2(channel, standardPayload({
       content: tipMessage(`<@${recipientId}>`, amount),
       allowedMentions: { parse: [], users: [recipientId] },
-    });
+    }));
     return interaction.editReply(`Tip message for <@${recipientId}> sent to ${channel}.`);
   }
 
@@ -1809,7 +1919,7 @@ async function handleTicketButton(interaction) {
       return interaction.reply({ content: 'This channel is not an active ticket.', ephemeral: true });
     }
     const settings = store.getSettings(interaction.guildId);
-    const ticketRoleIds = ticketAccessRoleIds(settings);
+    const ticketRoleIds = ticketAccessRoleIds(settings, ticketType(channel));
     const managerRoleIds = ticketManagerRoleIds(settings);
     if (!managerRoleIds.some((roleId) => memberHasRole(interaction, roleId))) {
       return interaction.reply({ content: 'Only members with the configured `/setadmin` or `/setowner` role can claim tickets.', ephemeral: true });
@@ -1869,7 +1979,7 @@ async function handleTicketButton(interaction) {
       }
 
       const settings = store.getSettings(interaction.guildId);
-      for (const roleId of ticketAccessRoleIds(settings)) {
+      for (const roleId of ticketAccessRoleIds(settings, ticketType(currentChannel))) {
         await currentChannel.permissionOverwrites.edit(roleId, {
           SendMessages: true,
           SendMessagesInThreads: true,
@@ -1979,7 +2089,7 @@ async function handleButton(interaction) {
   }
   if (action === 'processing') return;
 
-  const statusEmbed = orderStatusEmbed(order);
+  const statusText = orderStatusText(order);
   const completionReminderEmbed = action === 'complete' ? orderCompletionReminderEmbed() : null;
   const notificationFailures = [];
   if (action === 'complete') {
@@ -2002,10 +2112,10 @@ async function handleButton(interaction) {
         || typeof sourceChannel.send !== 'function') {
         throw new Error(`Order source channel ${order.sourceChannelId} is unavailable or not a sendable server text channel.`);
       }
-      await sendV2(sourceChannel, {
-        embeds: [statusEmbed],
+      await sendV2(sourceChannel, standardPayload({
+        content: statusText,
         allowedMentions: { parse: [] },
-      });
+      }));
       if (completionReminderEmbed) {
         await sendV2(sourceChannel, standardPayload({
           embeds: [completionReminderEmbed],
@@ -2019,7 +2129,10 @@ async function handleButton(interaction) {
   }
   try {
     const customer = await client.users.fetch(order.customerId);
-    await sendV2(customer, { embeds: [statusEmbed], allowedMentions: { parse: [] } });
+    await sendV2(customer, standardPayload({
+      content: statusText,
+      allowedMentions: { parse: [] },
+    }));
     if (completionReminderEmbed) {
       await sendV2(customer, {
         components: [vouchReminderContainer(order.guildId, order.sourceChannelId)],
@@ -2068,6 +2181,7 @@ client.once('ready', async () => {
   await restoreScheduledVoidChecks();
   await restoreScheduledOrderExpirations();
   await restoreScheduledGiveaways();
+  await restoreConfiguredVoiceChannels();
 });
 
 client.on('interactionCreate', async (interaction) => {

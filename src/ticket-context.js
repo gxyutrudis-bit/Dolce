@@ -10,6 +10,10 @@ function isOrderTicket(channel) {
   );
 }
 
+function ticketType(channel) {
+  return channel?.topic?.match(/(?:^|;)ticket-type:(order|report|others)(?:;|$)/)?.[1] ?? null;
+}
+
 function ticketChannelTopic(ownerId, type, orderForm) {
   return [
     `ticket-owner:${ownerId}`,
@@ -66,6 +70,7 @@ async function ticketQuantity(channel) {
 module.exports = {
   ticketOwnerId,
   isOrderTicket,
+  ticketType,
   ticketChannelTopic,
   ticketTermsRequired,
   ticketTermsAccepted,
