@@ -1192,16 +1192,11 @@ async function handleCommand(interaction) {
     if (!channel || channel.type !== ChannelType.GuildVoice) {
       return interaction.editReply('Join a regular voice channel first, then run `/join`.');
     }
-    const botMember = await interaction.guild.members.fetchMe();
-    const permissions = channel.permissionsFor(botMember);
-    if (!permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect])) {
-      return interaction.editReply('I need the View Channel and Connect permissions in that voice channel.');
-    }
     try {
       await connectToVoiceChannel(interaction.guild, channel);
     } catch (error) {
       console.error(`Could not join voice channel ${channel.id} in guild ${interaction.guildId}:`, error);
-      return interaction.editReply('I could not connect to that voice channel. Check my View Channel and Connect permissions, then try again.');
+      return interaction.editReply('I could not connect to that voice channel. Check that the channel is available and I have permission to access it, then try again.');
     }
     try {
       store.setSettings(interaction.guildId, { voiceChannelId: channel.id });
