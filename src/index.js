@@ -1197,8 +1197,18 @@ async function handleCommand(interaction) {
     if (!permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect])) {
       return interaction.editReply('I need the View Channel and Connect permissions in that voice channel.');
     }
-    await connectToVoiceChannel(interaction.guild, channel);
-    store.setSettings(interaction.guildId, { voiceChannelId: channel.id });
+    try {
+      await connectToVoiceChannel(interaction.guild, channel);
+    } catch (error) {
+      console.error(`Could not join voice channel ${channel.id} in guild ${interaction.guildId}:`, error);
+      return interaction.editReply('I could not connect to that voice channel. Check my View Channel and Connect permissions, then try again.');
+    }
+    try {
+      store.setSettings(interaction.guildId, { voiceChannelId: channel.id });
+    } catch (error) {
+      console.error(`Joined voice channel ${channel.id} in guild ${interaction.guildId}, but could not save the setting:`, error);
+      return interaction.editReply(`I joined **${channel.name}**, but could not save it for reconnection after a restart.`);
+    }
     return interaction.editReply(`Joined **${channel.name}**. I’ll reconnect here after a restart.`);
   }
 

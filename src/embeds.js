@@ -154,31 +154,33 @@ function orderStatusText(order) {
 }
 
 function voidedOrderMessage(user, product) {
-  const username = user?.username ? `@${user.username}` : '@unknown';
+  const username = user?.username ?? 'unknown';
   const userId = user?.id ?? 'unknown';
   return [
     '_ _ ─────────────  <:00_treat:1562793410157613156>  ─────────────',
     '_ _',
     `_ _  ${user?.id ? `<@${user.id}>` : '@user'}, your __warranty__ has been **voided**.`,
     '_ _',
-    `_ _ <:purpleflower:1557500052107304981>  user  :  ${username}  | ${userId} of ticket owner`,
+    `_ _ <:purpleflower:1557500052107304981>  user  :  ${username}  | ${userId}`,
     '_ _ <:purpleflower:1557500052107304981>  item purchased  :',
     `_ _ ⎯⎯  ${String(product ?? 'Unknown product')}`,
     '_ _ <:purpleflower:1557500052107304981>  reason  :',
     '_ _ ⎯⎯  no vouch = warranty voided',
     '_ _',
-    '_ _ ─────────────  <a:pinkletter:1450249803530244337>  ─────────────',
+    '_ _ ─────────────  :pinkletter:   ─────────────',
     '_ _',
-    ].join('\n');
+  ].join('\n');
 }
 
   function tipMessage(buyer, amount) {
     return [
-      `_ _ ${'<:Kurtina:1566436939979296848>'.repeat(12)}`,
-      '_ _              ꮺ  <:00_treat:1562793410157613156>  **tip  tip  tip  !**    ࣪    ⊹',
+      `_ _ ${'<:dolcevita:1567562931326025738><:dolcevita:1567562829001658428>'.repeat(6)}`,
       '_ _',
-      `_ _    ${amount}   tip   from   ${buyer}`,
+      '_ _            ꮺ  <:00_treat:1562793410157613156>  **tip  tip  tip  !**    ࣪    ⊹',
+      '_ _',
+      `_ _        ${amount}   tip   from   ${buyer}`,
       '_ _    thank   you   for   your   sugar  tip!',
+      '_ _',
       `_ _ ${'<:Bandage:1566436975416844298>'.repeat(12)}`,
     ].join('\n');
   }
@@ -411,7 +413,6 @@ function warrantyActivatedContainer(user, items, vouchedAt = new Date()) {
 
 function orderCompletionReminderEmbed() {
   return new EmbedBuilder()
-    .setColor(0x35a16b)
     .setDescription([
       '_ _',
       '_ _   __reminders__  :  **wαrrαnty  policy !!**  <:e_bread:1562794379796684890>',

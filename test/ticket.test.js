@@ -670,11 +670,13 @@ test('payment reminder V2 container supports servers without a custom icon', () 
 
 test('/tip send message uses the requested custom emojis and layout', () => {
   assert.equal(tipMessage('<@buyer-1>', '250'), [
-    `_ _ ${'<:Kurtina:1566436939979296848>'.repeat(12)}`,
-    '_ _              ꮺ  <:00_treat:1562793410157613156>  **tip  tip  tip  !**    ࣪    ⊹',
+    `_ _ ${'<:dolcevita:1567562931326025738><:dolcevita:1567562829001658428>'.repeat(6)}`,
     '_ _',
-    '_ _    250   tip   from   <@buyer-1>',
+    '_ _            ꮺ  <:00_treat:1562793410157613156>  **tip  tip  tip  !**    ࣪    ⊹',
+    '_ _',
+    '_ _        250   tip   from   <@buyer-1>',
     '_ _    thank   you   for   your   sugar  tip!',
+    '_ _',
     `_ _ ${'<:Bandage:1566436975416844298>'.repeat(12)}`,
   ].join('\n'));
 });
@@ -709,6 +711,7 @@ test('completed order reminder embed has no title and the warranty policy descri
   const embed = orderCompletionReminderEmbed().toJSON();
 
   assert.equal(embed.title, undefined);
+  assert.equal(embed.color, undefined);
   assert.equal(embed.description, [
     '_ _',
     '_ _   __reminders__  :  **wαrrαnty  policy !!**  <:e_bread:1562794379796684890>',
@@ -808,20 +811,20 @@ test('voided order notice uses the requested layout and includes buyer, item, an
     id: '1234567890',
     username: 'alice',
     tag: 'alice#0001',
-  }, 'ROBUX');
+  }, 'dekor');
 
   assert.equal(message, [
     '_ _ ─────────────  <:00_treat:1562793410157613156>  ─────────────',
     '_ _',
     '_ _  <@1234567890>, your __warranty__ has been **voided**.',
     '_ _',
-    '_ _ <:purpleflower:1557500052107304981>  user  :  @alice  | 1234567890 of ticket owner',
+    '_ _ <:purpleflower:1557500052107304981>  user  :  alice  | 1234567890',
     '_ _ <:purpleflower:1557500052107304981>  item purchased  :',
-    '_ _ ⎯⎯  ROBUX',
+    '_ _ ⎯⎯  dekor',
     '_ _ <:purpleflower:1557500052107304981>  reason  :',
     '_ _ ⎯⎯  no vouch = warranty voided',
     '_ _',
-    '_ _ ─────────────  <a:pinkletter:1450249803530244337>  ─────────────',
+    '_ _ ─────────────  :pinkletter:   ─────────────',
     '_ _',
   ].join('\n'));
 });
