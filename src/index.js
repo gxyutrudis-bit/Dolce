@@ -1192,6 +1192,14 @@ async function handleCommand(interaction) {
     if (!channel || channel.type !== ChannelType.GuildVoice) {
       return interaction.editReply('Join a regular voice channel first, then run `/join`.');
     }
+    await interaction.editReply('Checking voice channel access...');
+    const botMember = await interaction.guild.members.fetchMe();
+    const permissions = channel.permissionsFor(botMember);
+    if (!permissions?.has(PermissionFlagsBits.ViewChannel)
+      || !permissions.has(PermissionFlagsBits.Connect)) {
+      return interaction.editReply('I need **View Channel** and **Connect** permissions in that voice channel.');
+    }
+    await interaction.editReply(`Connecting to **${channel.name}**...`);
     try {
       await connectToVoiceChannel(interaction.guild, channel);
     } catch (error) {
