@@ -142,8 +142,7 @@ module.exports = [
       .setName('quantity')
       .setDescription('How many?')
       .setRequired(true)
-      .setMinValue(1)
-      .setMaxValue(9999)),
+      .setMinValue(1)),
   new SlashCommandBuilder()
     .setName('payment')
     .setDescription('Send the payment reminder in this ticket.'),

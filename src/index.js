@@ -73,7 +73,7 @@ const {
   ticketQuantity,
 } = require('./ticket-context');
 const { orderReference } = require('./order-reference');
-const { findActiveTicket, withTicketCreationLock } = require('./ticket-creation');
+const { findActiveTicket, withTicketCreationLock, ticketTypeAllowsMultipleActiveTickets } = require('./ticket-creation');
 const {
   ticketAccessRoleIds,
   ticketManagerRoleIds,
@@ -1078,8 +1078,10 @@ async function createTicketChannel(interaction, type, orderForm, reportForm, oth
   if (!guild) throw new Error('Tickets can only be created in a server.');
   return withTicketCreationLock(`${guild.id}:${interaction.user.id}`, async () => {
     const channels = await guild.channels.fetch();
-    const existingTicket = findActiveTicket(channels, interaction.user.id);
-    if (existingTicket) return { channel: existingTicket, created: false };
+    if (!ticketTypeAllowsMultipleActiveTickets(type)) {
+      const existingTicket = findActiveTicket(channels, interaction.user.id);
+      if (existingTicket) return { channel: existingTicket, created: false };
+    }
 
     const settings = store.getSettings(interaction.guildId);
     const ticketRoleIds = ticketAccessRoleIds(settings, type);
@@ -1484,12 +1486,12 @@ async function handleCommand(interaction) {
       });
     }
     await interaction.deferReply();
-    return interaction.editReply({
+    return interaction.editReply(standardPayload({
       content: queueConfirmationMessage(order),
       allowedMentions: {
         users: [...new Set([order.customerId, order.supporterId].filter(Boolean))],
       },
-    });
+    }));
   }
 
   if (interaction.commandName === 'queuelist') {

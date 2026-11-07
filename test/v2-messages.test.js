@@ -101,6 +101,23 @@ test('/order payload bypasses V2 conversion and retains standard message compone
   assert.deepEqual(v2Payload(orderPayload), payload);
 });
 
+test('/queue confirmation bypasses V2 conversion so it stays as a plain queued order message', async () => {
+  const queuePayload = standardPayload({
+    content: '_ _\\n_ _       ──────────  <:0cpink_bow:1562803659190829126>  ──────────\\n_ _              ꒰  <:00_treat:1562793410157613156>  ꒱   **order**  __queue__   !!',
+    allowedMentions: { parse: [] },
+  });
+  const wrappedInteraction = {
+    editReply: async (payload) => payload,
+  };
+  wrapInteractionResponses(wrappedInteraction);
+
+  const payload = await wrappedInteraction.editReply(queuePayload);
+  assert.match(payload.content, /__queue__/);
+  assert.equal(payload.flags, undefined);
+  assert.equal(payload.components, undefined);
+  assert.deepEqual(v2Payload(queuePayload), payload);
+});
+
 test('completion reminder sent to the order ticket bypasses V2 container conversion', async () => {
   const reminder = new EmbedBuilder().setDescription('Warranty reminder');
   let sentPayload;

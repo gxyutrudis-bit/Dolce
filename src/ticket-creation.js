@@ -20,4 +20,8 @@ function findActiveTicket(channels, ownerId) {
   return [...channels.values()].find((channel) => ticketOwnerId(channel) === ownerId) ?? null;
 }
 
-module.exports = { findActiveTicket, withTicketCreationLock };
+function ticketTypeAllowsMultipleActiveTickets(type) {
+  return type === 'order';
+}
+
+module.exports = { findActiveTicket, withTicketCreationLock, ticketTypeAllowsMultipleActiveTickets };

@@ -113,8 +113,8 @@ function vouchFormModal(guildId, ticketChannelId) {
         component: new TextInputBuilder()
           .setCustomId('quantity')
           .setStyle(TextInputStyle.Short)
-          .setPlaceholder('1-9999')
-          .setMaxLength(4)
+          .setPlaceholder('1+')
+          .setMaxLength(1024)
           .setRequired(true),
       }),
       new LabelBuilder({
@@ -575,21 +575,21 @@ function ticketPanelButtons() {
 function orderTicketModal() {
   return new ModalBuilder()
     .setCustomId('ticket:order-form')
-    .setTitle('ORDER FORM')
+    .setTitle('order form')
     .addComponents(
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('ticket-product')
-          .setLabel('PRODUCT')
+          .setLabel('product')
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
           .setMaxLength(1024)
-          .setPlaceholder('DEKOR / BOBUX / SVBOWCH / PREMS / NAYTRO / GCRED1TS'),
+          .setPlaceholder('dekor / bobux / svbowch / prems / naytro / gcred1ts'),
       ),
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('ticket-price')
-          .setLabel('PRICE')
+          .setLabel('price')
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
           .setMaxLength(100)
@@ -598,20 +598,20 @@ function orderTicketModal() {
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('ticket-quantity')
-          .setLabel('QUANTITY')
+          .setLabel('quantity')
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
-          .setMaxLength(4)
-          .setPlaceholder('1-9999'),
+          .setMaxLength(1024)
+          .setPlaceholder('1-10000'),
       ),
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('ticket-payment-method')
-          .setLabel('PAYMENT METHOD')
+          .setLabel('payment method')
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
           .setMaxLength(1024)
-          .setPlaceholder('GCASH / BANKTRANS / PAYMAYA'),
+          .setPlaceholder('gcash / banktrans / paymaya'),
       ),
     );
 }

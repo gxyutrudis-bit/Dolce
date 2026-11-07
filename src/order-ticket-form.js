@@ -13,8 +13,8 @@ function parseOrderTicketForm(form) {
   if (!price) {
     return { error: 'PRICE cannot be blank.' };
   }
-  if (!/^\d{1,4}$/.test(quantity) || Number(quantity) < 1 || Number(quantity) > 9999) {
-    return { error: 'QUANTITY must be a whole number from 1 to 9999.' };
+  if (!/^\d+$/.test(quantity) || Number(quantity) < 1 || Number(quantity) > 10000) {
+    return { error: 'QUANTITY must be a whole number from 1 to 10000.' };
   }
   if (!PAYMENT_METHODS.has(paymentMethod)) {
     return { error: 'PAYMENT METHOD must be GCASH, BANKTRANS, or PAYMAYA.' };

@@ -41,7 +41,11 @@ const {
   ticketCustomerId,
   ticketProduct,
 } = require('../src/ticket-context');
-const { findActiveTicket, withTicketCreationLock } = require('../src/ticket-creation');
+const {
+  findActiveTicket,
+  withTicketCreationLock,
+  ticketTypeAllowsMultipleActiveTickets,
+} = require('../src/ticket-creation');
 const { ticketTranscriptText, ticketTranscriptAttachment } = require('../src/ticket-transcript');
 const { parseTicketMessageCommand } = require('../src/ticket-message-commands');
 const {
@@ -67,26 +71,26 @@ test('ticket panel contains only the three requested buttons', () => {
 
 test('order ticket modal requires the product, price, quantity, and payment method fields', () => {
   const modal = orderTicketModal().toJSON();
-  assert.equal(modal.title, 'ORDER FORM');
+  assert.equal(modal.title, 'order form');
   assert.deepEqual(
     modal.components.map((row) => ({
       label: row.components[0].label,
       required: row.components[0].required,
     })),
     [
-      { label: 'PRODUCT', required: true },
-      { label: 'PRICE', required: true },
-      { label: 'QUANTITY', required: true },
-      { label: 'PAYMENT METHOD', required: true },
+      { label: 'product', required: true },
+      { label: 'price', required: true },
+      { label: 'quantity', required: true },
+      { label: 'payment method', required: true },
     ],
   );
   assert.deepEqual(
     modal.components.map((row) => row.components[0].placeholder),
-    ['DEKOR / BOBUX / SVBOWCH / PREMS / NAYTRO / GCRED1TS', 'e.g. ₱ 100', '1-9999', 'GCASH / BANKTRANS / PAYMAYA'],
+    ['dekor / bobux / svbowch / prems / naytro / gcred1ts', 'e.g. ₱ 100', '1-10000', 'gcash / banktrans / paymaya'],
   );
 });
 
-test('order ticket form accepts only listed products and payment methods with quantities from 1 to 9999', () => {
+test('order ticket form accepts only listed products and payment methods with quantities from 1 to 10000', () => {
   assert.deepEqual(parseOrderTicketForm({
     product: 'bobux',
     price: ' ₱ 600 ',
@@ -98,10 +102,10 @@ test('order ticket form accepts only listed products and payment methods with qu
   assert.deepEqual(parseOrderTicketForm({
     product: 'DEKOR',
     price: '120',
-    quantity: '9999',
+    quantity: '10000',
     paymentMethod: 'PAYMAYA',
   }), {
-    value: { product: 'DEKOR', price: '120', quantity: '9999', paymentMethod: 'PAYMAYA' },
+    value: { product: 'DEKOR', price: '120', quantity: '10000', paymentMethod: 'PAYMAYA' },
   });
   assert.deepEqual(parseOrderTicketForm({
     product: 'SVBOWCH',
@@ -130,15 +134,21 @@ test('order ticket form accepts only listed products and payment methods with qu
   assert.deepEqual(parseOrderTicketForm({
     product: 'PREMS',
     price: '100',
-    quantity: '10000',
+    quantity: '0',
     paymentMethod: 'GCASH',
-  }), { error: 'QUANTITY must be a whole number from 1 to 9999.' });
+  }), { error: 'QUANTITY must be a whole number from 1 to 10000.' });
+  assert.deepEqual(parseOrderTicketForm({
+    product: 'PREMS',
+    price: '100',
+    quantity: '10001',
+    paymentMethod: 'GCASH',
+  }), { error: 'QUANTITY must be a whole number from 1 to 10000.' });
   assert.deepEqual(parseOrderTicketForm({
     product: 'PREMS',
     price: '100',
     quantity: '1.5',
     paymentMethod: 'GCASH',
-  }), { error: 'QUANTITY must be a whole number from 1 to 9999.' });
+  }), { error: 'QUANTITY must be a whole number from 1 to 10000.' });
   assert.deepEqual(parseOrderTicketForm({
     product: 'PREMS',
     price: '100',
@@ -512,6 +522,12 @@ test('ticket creation finds existing tickets and serializes simultaneous submiss
 
   assert.equal(attempts.filter(Boolean).length, 1);
   assert.equal(channels.size, 1);
+});
+
+test('order tickets bypass the single-active-ticket rule while other ticket types remain limited', () => {
+  assert.equal(ticketTypeAllowsMultipleActiveTickets('order'), true);
+  assert.equal(ticketTypeAllowsMultipleActiveTickets('report'), false);
+  assert.equal(ticketTypeAllowsMultipleActiveTickets('others'), false);
 });
 
 test('/ticket setup is registered for administrators with an optional staff role', () => {
